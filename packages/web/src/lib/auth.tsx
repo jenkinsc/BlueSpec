@@ -42,10 +42,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const body = (await res.json().catch(() => ({}))) as { error?: string };
       throw new Error(body.error ?? 'Login failed');
     }
-    const data = (await res.json()) as { token: string; callsign: string };
+    const data = (await res.json()) as { token: string; operator: { callsign: string } };
     localStorage.setItem(TOKEN_KEY, data.token);
-    localStorage.setItem(CALLSIGN_KEY, data.callsign);
-    setAuth({ token: data.token, callsign: data.callsign });
+    localStorage.setItem(CALLSIGN_KEY, data.operator.callsign);
+    setAuth({ token: data.token, callsign: data.operator.callsign });
   }, []);
 
   const logout = useCallback(() => {
