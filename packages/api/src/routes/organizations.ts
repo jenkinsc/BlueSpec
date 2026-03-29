@@ -77,7 +77,7 @@ export const organizationsRouter = new Hono()
 
   // GET /organizations/:id — get org with members (auth required; caller must be a member)
   .get('/:id', requireAuth, async (c) => {
-    const id = c.req.param('id');
+    const id = c.req.param('id') as string;
     const operatorId = c.get('operatorId');
 
     const [org] = await db
@@ -120,7 +120,7 @@ export const organizationsRouter = new Hono()
 
   // POST /organizations/:id/members — invite member by callsign (admin only)
   .post('/:id/members', requireAuth, zValidator('json', InviteMemberSchema), async (c) => {
-    const orgId = c.req.param('id');
+    const orgId = c.req.param('id') as string;
     const operatorId = c.get('operatorId');
     const body = c.req.valid('json');
 
@@ -185,8 +185,8 @@ export const organizationsRouter = new Hono()
 
   // DELETE /organizations/:id/members/:opId — remove member (admin only)
   .delete('/:id/members/:opId', requireAuth, async (c) => {
-    const orgId = c.req.param('id');
-    const targetOpId = c.req.param('opId');
+    const orgId = c.req.param('id') as string;
+    const targetOpId = c.req.param('opId') as string;
     const callerOpId = c.get('operatorId');
 
     // Verify org exists

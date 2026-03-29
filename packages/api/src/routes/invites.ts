@@ -156,7 +156,7 @@ export const invitesRouter = new Hono()
 
   // POST /organizations/invites/:token/accept — accept invite (auth required)
   .post('/invites/:token/accept', requireAuth, async (c) => {
-    const rawToken = c.req.param('token');
+    const rawToken = c.req.param('token') as string;
     const tokenHash = hashToken(rawToken);
     const operatorId = c.get('operatorId');
     const now = new Date().toISOString();

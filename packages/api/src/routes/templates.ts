@@ -57,7 +57,7 @@ export const templatesRouter = new Hono()
     const [row] = await db
       .select()
       .from(netTemplates)
-      .where(eq(netTemplates.id, c.req.param('id')))
+      .where(eq(netTemplates.id, c.req.param('id') as string))
       .limit(1);
     if (!row) return c.json({ error: 'Not found' }, 404);
 
@@ -100,7 +100,7 @@ export const templatesRouter = new Hono()
   // PATCH /templates/:id — update (owner only)
   .patch('/:id', requireAuth, zValidator('json', UpdateTemplateSchema), async (c) => {
     const operatorId = c.get('operatorId');
-    const id = c.req.param('id');
+    const id = c.req.param('id') as string;
     const body = c.req.valid('json');
 
     const orgResult = await tryGetOrgId(c);
@@ -139,7 +139,7 @@ export const templatesRouter = new Hono()
   // DELETE /templates/:id — delete (owner only)
   .delete('/:id', requireAuth, async (c) => {
     const operatorId = c.get('operatorId');
-    const id = c.req.param('id');
+    const id = c.req.param('id') as string;
 
     const orgResult = await tryGetOrgId(c);
     if (orgResult instanceof Response) return orgResult;
