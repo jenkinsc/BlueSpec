@@ -13,6 +13,7 @@ interface AuthState {
 
 interface AuthContextValue extends AuthState {
   login: (callsign: string, password: string) => Promise<void>;
+  loginDemo: () => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
 }
@@ -48,6 +49,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuth({ token: data.token, callsign: data.operator.callsign });
   }, []);
 
+  const loginDemo = useCallback(async () => {
+    const res = await fetch('/auth/demo', { method: 'POST' });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(body.error ?? 'Demo login failed');
+    }
+    const data = (await res.json()) as { token: string; operator: { callsign: string } };
+    localStorage.setItem(TOKEN_KEY, data.token);
+    localStorage.setItem(CALLSIGN_KEY, data.operator.callsign);
+    setAuth({ token: data.token, callsign: data.operator.callsign });
+  }, []);
+
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(CALLSIGN_KEY);
@@ -56,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ ...auth, login, logout, isAuthenticated: !!auth.token }}
+      value={{ ...auth, login, loginDemo, logout, isAuthenticated: !!auth.token }}
     >
       {children}
     </AuthContext.Provider>

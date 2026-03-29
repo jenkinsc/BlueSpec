@@ -1,4 +1,6 @@
 import { Hono } from 'hono';
+import { cors } from 'hono/cors';
+import { secureHeaders } from 'hono/secure-headers';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { sql } from 'drizzle-orm';
 import { operatorsRouter } from './routes/operators.js';
@@ -7,15 +9,37 @@ import { netsRouter } from './routes/nets.js';
 import { checkInsRouter } from './routes/checkins.js';
 import { templatesRouter } from './routes/templates.js';
 import { organizationsRouter } from './routes/organizations.js';
+import { invitesRouter } from './routes/invites.js';
 import { authRouter } from './routes/auth.js';
 import { uiRouter, dashboardRoute } from './routes/ui.js';
 import { requestLogger } from './middleware/logger.js';
 import { errorHandler } from './middleware/error.js';
+import { rateLimit } from './middleware/rateLimit.js';
 import { openApiSpec } from './openapi.js';
 import { db } from './db/index.js';
 
 export function createApp() {
   const app = new Hono();
+
+  // Security headers
+  app.use('*', secureHeaders());
+
+  // CORS
+  const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? 'http://localhost:5173')
+    .split(',')
+    .map((s) => s.trim());
+  app.use(
+    '*',
+    cors({
+      origin: allowedOrigins,
+      allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowHeaders: ['Authorization', 'Content-Type', 'X-Org-Id'],
+      credentials: true,
+    }),
+  );
+
+  // Global rate limit: 100 req/min per IP
+  app.use('*', rateLimit({ name: 'global', max: 100, windowMs: 60_000 }));
 
   app.use('*', requestLogger);
 
@@ -32,7 +56,8 @@ export function createApp() {
   });
   app.get('/openapi.json', (c) => c.json(openApiSpec));
 
-  // Auth (public)
+  // Auth (public) — tighter rate limit on login/register/demo
+  app.use('/auth/*', rateLimit({ name: 'auth', max: 10, windowMs: 60_000 }));
   app.route('/auth', authRouter);
 
   // Web UI
@@ -46,6 +71,7 @@ export function createApp() {
   app.route('/check-ins', checkInsRouter);
   app.route('/templates', templatesRouter);
   app.route('/organizations', organizationsRouter);
+  app.route('/organizations', invitesRouter);
 
   // Also mount under /api prefix for React SPA compatibility in production
   const apiRouter = new Hono()
@@ -54,7 +80,8 @@ export function createApp() {
     .route('/nets', netsRouter)
     .route('/check-ins', checkInsRouter)
     .route('/templates', templatesRouter)
-    .route('/organizations', organizationsRouter);
+    .route('/organizations', organizationsRouter)
+    .route('/organizations', invitesRouter);
   app.route('/api', apiRouter);
 
   // Serve React SPA static assets from ./public (populated in production Docker build)

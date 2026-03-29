@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -12,8 +13,10 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 export function LoginPage() {
-  const { login } = useAuth();
+  const { login, loginDemo } = useAuth();
   const navigate = useNavigate();
+  const [demoLoading, setDemoLoading] = useState(false);
+  const [demoError, setDemoError] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
@@ -86,6 +89,29 @@ export function LoginPage() {
             {isSubmitting ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
+
+        <div className="mt-4 text-center">
+          <p className="text-xs text-gray-400 mb-2">Want to explore without signing up?</p>
+          {demoError && <p className="text-xs text-red-600 mb-2">{demoError}</p>}
+          <button
+            onClick={async () => {
+              setDemoLoading(true);
+              setDemoError(null);
+              try {
+                await loginDemo();
+                navigate('/', { replace: true });
+              } catch (err) {
+                setDemoError(err instanceof Error ? err.message : 'Demo failed');
+              } finally {
+                setDemoLoading(false);
+              }
+            }}
+            disabled={demoLoading}
+            className="text-sm font-medium text-indigo-600 hover:underline disabled:opacity-50"
+          >
+            {demoLoading ? 'Starting demo…' : 'Try Demo →'}
+          </button>
+        </div>
       </div>
     </div>
   );

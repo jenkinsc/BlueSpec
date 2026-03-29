@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../lib/auth.tsx';
+import { OnboardingModal, useOnboarding } from './OnboardingModal.tsx';
 
 const navItems = [
   { to: '/', label: 'Nets', icon: '📡' },
@@ -28,6 +30,8 @@ function NavItem({ to, label, icon }: { to: string; label: string; icon: string 
 
 export function AppShell() {
   const { callsign, logout } = useAuth();
+  const onboarding = useOnboarding();
+  const [showOnboarding, setShowOnboarding] = useState(!onboarding.isComplete);
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
@@ -76,6 +80,15 @@ export function AppShell() {
           <NavItem key={item.to} {...item} />
         ))}
       </nav>
+
+      {showOnboarding && (
+        <OnboardingModal
+          onClose={() => {
+            onboarding.markComplete();
+            setShowOnboarding(false);
+          }}
+        />
+      )}
     </div>
   );
 }

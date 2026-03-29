@@ -115,6 +115,22 @@ export const netTemplates = sqliteTable('net_templates', {
   updatedAt: text('updated_at').notNull(),
 });
 
+// Organization invites — email-based magic-link invite flow (BLUAAA-43)
+export const orgInvites = sqliteTable('org_invites', {
+  id: text('id').primaryKey(),
+  organizationId: text('organization_id')
+    .notNull()
+    .references(() => organizations.id, { onDelete: 'cascade' }),
+  email: text('email').notNull(),
+  tokenHash: text('token_hash').notNull().unique(), // SHA-256 of the raw JWT invite token
+  invitedByOperatorId: text('invited_by_operator_id')
+    .notNull()
+    .references(() => operators.id),
+  acceptedAt: text('accepted_at'),
+  expiresAt: text('expires_at').notNull(),
+  createdAt: text('created_at').notNull(),
+});
+
 export type OperatorRow = typeof operators.$inferSelect;
 export type NewOperatorRow = typeof operators.$inferInsert;
 export type IncidentRow = typeof incidents.$inferSelect;

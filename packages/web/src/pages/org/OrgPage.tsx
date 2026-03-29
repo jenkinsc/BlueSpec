@@ -112,12 +112,14 @@ function CreateOrgModal({
 // --- Invite form ---
 function InviteForm({ orgId }: { orgId: string }) {
   const queryClient = useQueryClient();
+  const [tab, setTab] = useState<'callsign' | 'email'>('callsign');
   const [callsign, setCallsign] = useState('');
+  const [email, setEmail] = useState('');
   const [role, setRole] = useState<'admin' | 'member'>('member');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const mutation = useMutation({
+  const callsignMutation = useMutation({
     mutationFn: () =>
       apiFetch<Member>(`/api/organizations/${orgId}/members`, {
         method: 'POST',
@@ -136,39 +138,99 @@ function InviteForm({ orgId }: { orgId: string }) {
     },
   });
 
+  const emailMutation = useMutation({
+    mutationFn: () =>
+      apiFetch<{ id: string; email: string; expiresAt: string }>(
+        `/api/organizations/${orgId}/invites`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ email }),
+        },
+      ),
+    onSuccess: () => {
+      setSuccess(`Invite sent to ${email}`);
+      setEmail('');
+      setError(null);
+      setTimeout(() => setSuccess(null), 4000);
+    },
+    onError: (err) => {
+      setError(err instanceof Error ? err.message : 'Failed to send invite');
+      setSuccess(null);
+    },
+  });
+
   return (
     <div className="border-t border-gray-200 px-4 py-3">
-      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Invite Member</p>
+      <div className="flex items-center gap-3 mb-2">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Invite Member</p>
+        <div className="flex gap-1 text-xs">
+          <button
+            onClick={() => setTab('callsign')}
+            className={`px-2 py-0.5 rounded ${tab === 'callsign' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-400 hover:text-gray-600'}`}
+          >
+            Callsign
+          </button>
+          <button
+            onClick={() => setTab('email')}
+            className={`px-2 py-0.5 rounded ${tab === 'email' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-400 hover:text-gray-600'}`}
+          >
+            Email
+          </button>
+        </div>
+      </div>
       {error && <p className="text-xs text-red-600 mb-1">{error}</p>}
       {success && <p className="text-xs text-green-600 mb-1">{success}</p>}
-      <div className="flex gap-2 items-end">
-        <div className="flex-1">
-          <input
-            value={callsign}
-            onChange={(e) => setCallsign(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && callsign.trim()) mutation.mutate(); }}
-            placeholder="Callsign"
-            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-        <div>
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value as 'admin' | 'member')}
-            className="border border-gray-300 rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+
+      {tab === 'callsign' ? (
+        <div className="flex gap-2 items-end">
+          <div className="flex-1">
+            <input
+              value={callsign}
+              onChange={(e) => setCallsign(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && callsign.trim()) callsignMutation.mutate(); }}
+              placeholder="Callsign"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          <div>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value as 'admin' | 'member')}
+              className="border border-gray-300 rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="member">Member</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <button
+            onClick={() => callsign.trim() && callsignMutation.mutate()}
+            disabled={!callsign.trim() || callsignMutation.isPending}
+            className="bg-indigo-600 text-white text-sm font-medium px-3 py-2 rounded-md hover:bg-indigo-700 disabled:opacity-50"
           >
-            <option value="member">Member</option>
-            <option value="admin">Admin</option>
-          </select>
+            {callsignMutation.isPending ? '…' : 'Add'}
+          </button>
         </div>
-        <button
-          onClick={() => callsign.trim() && mutation.mutate()}
-          disabled={!callsign.trim() || mutation.isPending}
-          className="bg-indigo-600 text-white text-sm font-medium px-3 py-2 rounded-md hover:bg-indigo-700 disabled:opacity-50"
-        >
-          {mutation.isPending ? '…' : 'Invite'}
-        </button>
-      </div>
+      ) : (
+        <div className="flex gap-2 items-end">
+          <div className="flex-1">
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && email.trim()) emailMutation.mutate(); }}
+              placeholder="operator@example.com"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          <button
+            onClick={() => email.trim() && emailMutation.mutate()}
+            disabled={!email.trim() || emailMutation.isPending}
+            className="bg-indigo-600 text-white text-sm font-medium px-3 py-2 rounded-md hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {emailMutation.isPending ? '…' : 'Send Invite'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
