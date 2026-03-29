@@ -43,6 +43,13 @@
       "when": 1743624000000,
       "tag": "0005_organizations",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1743710400000,
+      "tag": "0006_multi_tenancy",
+      "breakpoints": true
     }
   ]
 }

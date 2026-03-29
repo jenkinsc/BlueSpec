@@ -6,6 +6,7 @@ import { db } from '../db/index.js';
 import { incidents, incidentActivities, nets } from '../db/schema.js';
 import { newId } from '../lib/ids.js';
 import { requireAuth } from '../middleware/auth.js';
+import { tryGetOrgId } from '../middleware/org.js';
 
 const STATUS_ENUM = ['reported', 'active', 'resolved', 'cancelled'] as const;
 // Forward-only transition order for reported → active → resolved
@@ -38,6 +39,8 @@ const CreateActivitySchema = z.object({
 
 export const incidentsRouter = new Hono()
   // GET /incidents — list; optional ?status= and ?netId= filters
+  // If X-Org-Id header is present, validates membership and filters by org.
+  // Without X-Org-Id, returns all incidents (public access preserved).
   .get('/', async (c) => {
     const statusParam = c.req.query('status');
     const netIdParam = c.req.query('netId');
@@ -49,8 +52,13 @@ export const incidentsRouter = new Hono()
       }
     }
 
+    const orgResult = await tryGetOrgId(c);
+    if (orgResult instanceof Response) return orgResult;
+    const orgId = orgResult;
+
     let query = db.select().from(incidents).$dynamic();
     const conditions = [];
+    if (orgId) conditions.push(eq(incidents.organizationId, orgId));
     if (statusParam) conditions.push(eq(incidents.status, statusParam));
     if (netIdParam) conditions.push(eq(incidents.netId, netIdParam));
     if (conditions.length > 0) {
@@ -62,10 +70,20 @@ export const incidentsRouter = new Hono()
   })
 
   // GET /incidents/:id — get with latest activity entries
+  // If X-Org-Id is present and incident belongs to a different org, returns 404.
   .get('/:id', async (c) => {
     const id = c.req.param('id');
+
+    const orgResult = await tryGetOrgId(c);
+    if (orgResult instanceof Response) return orgResult;
+    const orgId = orgResult;
+
     const [row] = await db.select().from(incidents).where(eq(incidents.id, id)).limit(1);
     if (!row) return c.json({ error: 'Not found' }, 404);
+
+    if (orgId && row.organizationId !== orgId) {
+      return c.json({ error: 'Not found' }, 404);
+    }
 
     const activities = await db
       .select()
@@ -77,9 +95,14 @@ export const incidentsRouter = new Hono()
   })
 
   // POST /incidents — create (auth required)
+  // If X-Org-Id header is present, validates membership and sets organizationId.
   .post('/', requireAuth, zValidator('json', CreateIncidentSchema), async (c) => {
     const body = c.req.valid('json');
     const operatorId = c.get('operatorId');
+
+    const orgResult = await tryGetOrgId(c);
+    if (orgResult instanceof Response) return orgResult;
+    const orgId = orgResult;
 
     // Validate net_id if provided
     if (body.net_id) {
@@ -100,6 +123,7 @@ export const incidentsRouter = new Hono()
         location: body.location,
         netId: body.net_id,
         createdByOperatorId: operatorId,
+        organizationId: orgId,
         status: 'reported',
         createdAt: now,
         updatedAt: now,
@@ -114,8 +138,16 @@ export const incidentsRouter = new Hono()
     const operatorId = c.get('operatorId');
     const body = c.req.valid('json');
 
+    const orgResult = await tryGetOrgId(c);
+    if (orgResult instanceof Response) return orgResult;
+    const orgId = orgResult;
+
     const [row] = await db.select().from(incidents).where(eq(incidents.id, id)).limit(1);
     if (!row) return c.json({ error: 'Not found' }, 404);
+
+    if (orgId && row.organizationId !== orgId) {
+      return c.json({ error: 'Not found' }, 404);
+    }
 
     if (row.createdByOperatorId && row.createdByOperatorId !== operatorId) {
       return c.json({ error: 'Forbidden: only the incident creator may update this incident' }, 403);
@@ -173,8 +205,16 @@ export const incidentsRouter = new Hono()
     const operatorId = c.get('operatorId');
     const body = c.req.valid('json');
 
-    const [row] = await db.select({ id: incidents.id }).from(incidents).where(eq(incidents.id, id)).limit(1);
+    const orgResult = await tryGetOrgId(c);
+    if (orgResult instanceof Response) return orgResult;
+    const orgId = orgResult;
+
+    const [row] = await db.select().from(incidents).where(eq(incidents.id, id)).limit(1);
     if (!row) return c.json({ error: 'Not found' }, 404);
+
+    if (orgId && row.organizationId !== orgId) {
+      return c.json({ error: 'Not found' }, 404);
+    }
 
     const now = new Date().toISOString();
     const [created] = await db
@@ -194,8 +234,16 @@ export const incidentsRouter = new Hono()
   .get('/:id/activities', async (c) => {
     const id = c.req.param('id');
 
-    const [row] = await db.select({ id: incidents.id }).from(incidents).where(eq(incidents.id, id)).limit(1);
+    const orgResult = await tryGetOrgId(c);
+    if (orgResult instanceof Response) return orgResult;
+    const orgId = orgResult;
+
+    const [row] = await db.select().from(incidents).where(eq(incidents.id, id)).limit(1);
     if (!row) return c.json({ error: 'Not found' }, 404);
+
+    if (orgId && row.organizationId !== orgId) {
+      return c.json({ error: 'Not found' }, 404);
+    }
 
     const activities = await db
       .select()

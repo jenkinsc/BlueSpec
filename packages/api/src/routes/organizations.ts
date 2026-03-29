@@ -75,9 +75,10 @@ export const organizationsRouter = new Hono()
     return c.json(allOrgs.flat());
   })
 
-  // GET /organizations/:id — get org with members
+  // GET /organizations/:id — get org with members (auth required; caller must be a member)
   .get('/:id', requireAuth, async (c) => {
     const id = c.req.param('id');
+    const operatorId = c.get('operatorId');
 
     const [org] = await db
       .select()
@@ -85,6 +86,21 @@ export const organizationsRouter = new Hono()
       .where(eq(organizations.id, id))
       .limit(1);
     if (!org) return c.json({ error: 'Not found' }, 404);
+
+    // Enforce that the caller is a member of the org
+    const [callerMembership] = await db
+      .select({ id: organizationMembers.id })
+      .from(organizationMembers)
+      .where(
+        and(
+          eq(organizationMembers.organizationId, id),
+          eq(organizationMembers.operatorId, operatorId),
+        ),
+      )
+      .limit(1);
+    if (!callerMembership) {
+      return c.json({ error: 'Forbidden: you are not a member of this organization' }, 403);
+    }
 
     const members = await db
       .select({

@@ -3,9 +3,10 @@ import { zValidator } from '@hono/zod-validator';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/index.js';
-import { nets, checkIns, operators } from '../db/schema.js';
+import { nets, checkIns } from '../db/schema.js';
 import { newId } from '../lib/ids.js';
 import { requireAuth } from '../middleware/auth.js';
+import { tryGetOrgId } from '../middleware/org.js';
 
 const MODE_ENUM = ['FM', 'SSB', 'CW', 'DMR', 'D-STAR', 'FT8', 'other'] as const;
 const STATUS_ENUM = ['draft', 'open', 'closed'] as const;
@@ -52,6 +53,8 @@ const UpdateCheckInSchema = z.object({
 
 export const netsRouter = new Hono()
   // GET /nets — list nets, optional ?status= filter (default: open)
+  // If X-Org-Id header is present, validates membership and filters by org.
+  // Without X-Org-Id, returns all nets (public access preserved).
   .get('/', async (c) => {
     const statusParam = c.req.query('status') ?? 'open';
     const parsed = ListStatusSchema.safeParse(statusParam);
@@ -59,29 +62,56 @@ export const netsRouter = new Hono()
       return c.json({ error: 'Invalid status. Use: draft, open, closed, all' }, 400);
     }
     const filter = parsed.data;
+
+    const orgResult = await tryGetOrgId(c);
+    if (orgResult instanceof Response) return orgResult;
+    const orgId = orgResult;
+
+    const conditions = [];
+    if (orgId) conditions.push(eq(nets.organizationId, orgId));
+    if (filter !== 'all') conditions.push(eq(nets.status, filter));
+
     const rows =
-      filter === 'all'
-        ? await db.select().from(nets)
-        : await db.select().from(nets).where(eq(nets.status, filter));
+      conditions.length > 0
+        ? await db.select().from(nets).where(and(...conditions))
+        : await db.select().from(nets);
     return c.json(rows);
   })
 
   // GET /nets/:id — get net by id
+  // If X-Org-Id is present and net belongs to a different org, returns 404.
   .get('/:id', async (c) => {
     const id = c.req.param('id') as string;
+
+    const orgResult = await tryGetOrgId(c);
+    if (orgResult instanceof Response) return orgResult;
+    const orgId = orgResult;
+
     const [row] = await db
       .select()
       .from(nets)
       .where(eq(nets.id, id))
       .limit(1);
     if (!row) return c.json({ error: 'Not found' }, 404);
+
+    if (orgId && row.organizationId !== orgId) {
+      return c.json({ error: 'Not found' }, 404);
+    }
+
     return c.json(row);
   })
 
   // POST /nets — create a net in draft status (auth required)
+  // If X-Org-Id header is present, validates membership and sets organizationId.
   .post('/', requireAuth, zValidator('json', CreateNetSchema), async (c) => {
     const body = c.req.valid('json');
     const callsign = c.get('callsign') as string;
+    const operatorId = c.get('operatorId') as string;
+
+    const orgResult = await tryGetOrgId(c);
+    if (orgResult instanceof Response) return orgResult;
+    const orgId = orgResult;
+
     const now = new Date().toISOString();
     const [created] = await db
       .insert(nets)
@@ -92,6 +122,7 @@ export const netsRouter = new Hono()
         mode: body.mode,
         schedule: body.schedule,
         netControl: callsign,
+        organizationId: orgId,
         status: 'draft',
         createdAt: now,
         updatedAt: now,
@@ -106,8 +137,16 @@ export const netsRouter = new Hono()
     const operatorId = c.get('operatorId') as string;
     const body = c.req.valid('json');
 
+    const orgResult = await tryGetOrgId(c);
+    if (orgResult instanceof Response) return orgResult;
+    const orgId = orgResult;
+
     const [row] = await db.select().from(nets).where(eq(nets.id, id)).limit(1);
     if (!row) return c.json({ error: 'Not found' }, 404);
+
+    if (orgId && row.organizationId !== orgId) {
+      return c.json({ error: 'Not found' }, 404);
+    }
 
     if (row.netControlId && row.netControlId !== operatorId) {
       return c.json({ error: 'Forbidden: only the net control operator may update this net' }, 403);
@@ -133,8 +172,16 @@ export const netsRouter = new Hono()
     const id = c.req.param('id') as string;
     const operatorId = c.get('operatorId') as string;
 
+    const orgResult = await tryGetOrgId(c);
+    if (orgResult instanceof Response) return orgResult;
+    const orgId = orgResult;
+
     const [row] = await db.select().from(nets).where(eq(nets.id, id)).limit(1);
     if (!row) return c.json({ error: 'Not found' }, 404);
+
+    if (orgId && row.organizationId !== orgId) {
+      return c.json({ error: 'Not found' }, 404);
+    }
 
     if (row.status !== 'draft') {
       return c.json(
@@ -157,8 +204,16 @@ export const netsRouter = new Hono()
     const id = c.req.param('id') as string;
     const operatorId = c.get('operatorId') as string;
 
+    const orgResult = await tryGetOrgId(c);
+    if (orgResult instanceof Response) return orgResult;
+    const orgId = orgResult;
+
     const [row] = await db.select().from(nets).where(eq(nets.id, id)).limit(1);
     if (!row) return c.json({ error: 'Not found' }, 404);
+
+    if (orgId && row.organizationId !== orgId) {
+      return c.json({ error: 'Not found' }, 404);
+    }
 
     if (row.status !== 'open') {
       return c.json(
@@ -183,10 +238,20 @@ export const netsRouter = new Hono()
   // --- Net-scoped check-in routes ---
 
   // GET /nets/:netId/check-ins — list check-ins for a net (optional auth)
+  // If X-Org-Id is present and net belongs to a different org, returns 404.
   .get('/:netId/check-ins', async (c) => {
     const netId = c.req.param('netId') as string;
+
+    const orgResult = await tryGetOrgId(c);
+    if (orgResult instanceof Response) return orgResult;
+    const orgId = orgResult;
+
     const [net] = await db.select().from(nets).where(eq(nets.id, netId)).limit(1);
     if (!net) return c.json({ error: 'Net not found' }, 404);
+
+    if (orgId && net.organizationId !== orgId) {
+      return c.json({ error: 'Net not found' }, 404);
+    }
 
     const rows = await db.select().from(checkIns).where(eq(checkIns.netId, netId));
     return c.json(rows);
@@ -199,9 +264,18 @@ export const netsRouter = new Hono()
     const callsign = c.get('callsign') as string;
     const body = c.req.valid('json');
 
+    const orgResult = await tryGetOrgId(c);
+    if (orgResult instanceof Response) return orgResult;
+    const orgId = orgResult;
+
     // Verify net exists and is open
     const [net] = await db.select().from(nets).where(eq(nets.id, netId)).limit(1);
     if (!net) return c.json({ error: 'Net not found' }, 404);
+
+    if (orgId && net.organizationId !== orgId) {
+      return c.json({ error: 'Net not found' }, 404);
+    }
+
     if (net.status !== 'open') {
       return c.json({ error: 'net_not_open' }, 409);
     }
@@ -241,9 +315,17 @@ export const netsRouter = new Hono()
     const operatorId = c.get('operatorId') as string;
     const body = c.req.valid('json');
 
+    const orgResult = await tryGetOrgId(c);
+    if (orgResult instanceof Response) return orgResult;
+    const orgId = orgResult;
+
     // Verify net exists
     const [net] = await db.select().from(nets).where(eq(nets.id, netId)).limit(1);
     if (!net) return c.json({ error: 'Net not found' }, 404);
+
+    if (orgId && net.organizationId !== orgId) {
+      return c.json({ error: 'Net not found' }, 404);
+    }
 
     // Only net control may update check-ins
     if (net.netControlId !== operatorId) {
@@ -278,9 +360,17 @@ export const netsRouter = new Hono()
     const checkInId = c.req.param('id') as string;
     const operatorId = c.get('operatorId') as string;
 
+    const orgResult = await tryGetOrgId(c);
+    if (orgResult instanceof Response) return orgResult;
+    const orgId = orgResult;
+
     // Verify net exists
     const [net] = await db.select().from(nets).where(eq(nets.id, netId)).limit(1);
     if (!net) return c.json({ error: 'Net not found' }, 404);
+
+    if (orgId && net.organizationId !== orgId) {
+      return c.json({ error: 'Net not found' }, 404);
+    }
 
     // Only net control may remove check-ins
     if (net.netControlId !== operatorId) {

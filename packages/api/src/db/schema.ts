@@ -28,6 +28,7 @@ export const incidents = sqliteTable('incidents', {
   servedAgency: text('served_agency'),
   netId: text('net_id'), // FK to nets(id) enforced by migration; no Drizzle ref to avoid circular
   createdByOperatorId: text('created_by_operator_id').references(() => operators.id),
+  organizationId: text('organization_id'), // FK to organizations(id); set when X-Org-Id header present (BLUAAA-37)
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   resolvedAt: text('resolved_at'), // M1 legacy field
@@ -44,6 +45,7 @@ export const nets = sqliteTable('nets', {
   netControlId: text('net_control_id').references(() => operators.id), // FK set on open
   status: text('status').notNull().default('draft'), // 'draft' | 'open' | 'closed'
   incidentId: text('incident_id').references(() => incidents.id),
+  organizationId: text('organization_id'), // FK to organizations(id); set when X-Org-Id header present (BLUAAA-37)
   openedAt: text('opened_at'),
   startedAt: text('started_at'),
   closedAt: text('closed_at'),
@@ -103,6 +105,7 @@ export const organizationMembers = sqliteTable('organization_members', {
 export const netTemplates = sqliteTable('net_templates', {
   id: text('id').primaryKey(),
   operatorId: text('operator_id').notNull().references(() => operators.id),
+  organizationId: text('organization_id'), // FK to organizations(id); set when X-Org-Id header present (BLUAAA-37)
   name: text('name').notNull(),
   frequency: text('frequency').notNull(), // decimal string e.g. "146.520"
   mode: text('mode').notNull().default('FM'),

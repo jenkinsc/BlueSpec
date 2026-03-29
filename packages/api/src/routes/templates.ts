@@ -6,6 +6,7 @@ import { db } from '../db/index.js';
 import { netTemplates } from '../db/schema.js';
 import { newId } from '../lib/ids.js';
 import { requireAuth } from '../middleware/auth.js';
+import { tryGetOrgId } from '../middleware/org.js';
 
 const MODE_ENUM = ['FM', 'SSB', 'CW', 'DMR', 'D-STAR', 'FT8', 'other'] as const;
 
@@ -30,37 +31,60 @@ const UpdateTemplateSchema = z.object({
 });
 
 export const templatesRouter = new Hono()
-  // GET /templates — list caller's templates (auth required)
+  // GET /templates — list templates (auth required)
+  // If X-Org-Id is present: validates membership and filters by org.
+  // Without X-Org-Id: filters by operatorId (existing per-operator behavior).
   .get('/', requireAuth, async (c) => {
     const operatorId = c.get('operatorId');
-    const rows = await db
-      .select()
-      .from(netTemplates)
-      .where(eq(netTemplates.operatorId, operatorId));
+
+    const orgResult = await tryGetOrgId(c);
+    if (orgResult instanceof Response) return orgResult;
+    const orgId = orgResult;
+
+    const rows = orgId
+      ? await db.select().from(netTemplates).where(eq(netTemplates.organizationId, orgId))
+      : await db.select().from(netTemplates).where(eq(netTemplates.operatorId, operatorId));
     return c.json(rows);
   })
 
-  // GET /templates/:id — get by id (public read)
+  // GET /templates/:id — get by id
+  // If X-Org-Id is present and template belongs to a different org, returns 404.
   .get('/:id', async (c) => {
+    const orgResult = await tryGetOrgId(c);
+    if (orgResult instanceof Response) return orgResult;
+    const orgId = orgResult;
+
     const [row] = await db
       .select()
       .from(netTemplates)
       .where(eq(netTemplates.id, c.req.param('id')))
       .limit(1);
     if (!row) return c.json({ error: 'Not found' }, 404);
+
+    if (orgId && row.organizationId !== orgId) {
+      return c.json({ error: 'Not found' }, 404);
+    }
+
     return c.json(row);
   })
 
   // POST /templates — create (auth required)
+  // If X-Org-Id is present, validates membership and sets organizationId.
   .post('/', requireAuth, zValidator('json', CreateTemplateSchema), async (c) => {
     const operatorId = c.get('operatorId');
     const body = c.req.valid('json');
+
+    const orgResult = await tryGetOrgId(c);
+    if (orgResult instanceof Response) return orgResult;
+    const orgId = orgResult;
+
     const now = new Date().toISOString();
     const [created] = await db
       .insert(netTemplates)
       .values({
         id: newId(),
         operatorId,
+        organizationId: orgId,
         name: body.name,
         frequency: body.frequency,
         mode: body.mode,
@@ -79,12 +103,21 @@ export const templatesRouter = new Hono()
     const id = c.req.param('id');
     const body = c.req.valid('json');
 
+    const orgResult = await tryGetOrgId(c);
+    if (orgResult instanceof Response) return orgResult;
+    const orgId = orgResult;
+
     const [row] = await db
       .select()
       .from(netTemplates)
       .where(eq(netTemplates.id, id))
       .limit(1);
     if (!row) return c.json({ error: 'Not found' }, 404);
+
+    if (orgId && row.organizationId !== orgId) {
+      return c.json({ error: 'Not found' }, 404);
+    }
+
     if (row.operatorId !== operatorId) return c.json({ error: 'Forbidden' }, 403);
 
     const now = new Date().toISOString();
@@ -108,12 +141,21 @@ export const templatesRouter = new Hono()
     const operatorId = c.get('operatorId');
     const id = c.req.param('id');
 
+    const orgResult = await tryGetOrgId(c);
+    if (orgResult instanceof Response) return orgResult;
+    const orgId = orgResult;
+
     const [row] = await db
       .select()
       .from(netTemplates)
       .where(eq(netTemplates.id, id))
       .limit(1);
     if (!row) return c.json({ error: 'Not found' }, 404);
+
+    if (orgId && row.organizationId !== orgId) {
+      return c.json({ error: 'Not found' }, 404);
+    }
+
     if (row.operatorId !== operatorId) return c.json({ error: 'Forbidden' }, 403);
 
     await db
