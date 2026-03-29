@@ -15,6 +15,13 @@
       "when": 1743278400000,
       "tag": "0001_net_management_m2",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1743364800000,
+      "tag": "0002_checkin_flow_m2",
+      "breakpoints": true
     }
   ]
 }

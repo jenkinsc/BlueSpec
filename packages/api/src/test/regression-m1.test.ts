@@ -498,30 +498,39 @@ describe('REST API — /incidents CRUD', () => {
 
 // ─── REST API: Check-ins CRUD ─────────────────────────────────────────────────
 
-describe('REST API — /check-ins CRUD', () => {
+// M2: Check-in routes are now net-scoped (POST/PATCH/DELETE under /nets/:netId/check-ins)
+// Generic GET /check-ins is retained for backward-compat query/search use.
+describe('REST API — /check-ins CRUD (M2 net-scoped)', () => {
   let checkInId: string;
   let testNetId: string;
   let ciAuthToken: string;
 
   beforeAll(async () => {
-    // Create a net with auth (POST /nets requires auth as of current implementation)
+    // Register + login as the net control operator
     const cs = uniqueCallsign();
     await register(cs);
     const loginRes = await login(cs);
     ciAuthToken = (await loginRes.json()).token;
 
+    // Create a net, then open it (check-ins require status=open)
     const netRes = await client.request('/nets', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ciAuthToken}` },
       body: JSON.stringify({ name: 'Check-in Test Net', frequency: '146.520' }),
     });
     testNetId = (await netRes.json()).id;
+
+    await client.request(`/nets/${testNetId}/open`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${ciAuthToken}` },
+    });
   });
 
-  it('POST /check-ins → 201', async () => {
-    const res = await client.post('/check-ins', {
-      netId: testNetId,
-      operatorCallsign: 'W1CHECK',
+  it('POST /nets/:netId/check-ins → 201 (auth required)', async () => {
+    const res = await client.request(`/nets/${testNetId}/check-ins`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ciAuthToken}` },
+      body: JSON.stringify({ signal_report: '59', traffic_type: 'routine' }),
     });
     expect(res.status).toBe(201);
     const body = await res.json();
@@ -529,20 +538,31 @@ describe('REST API — /check-ins CRUD', () => {
     checkInId = body.id;
   });
 
-  it('POST /check-ins invalid netId (not UUID) → 400 [FINDING: spec says 422]', async () => {
-    const res = await client.post('/check-ins', {
-      netId: 'not-a-uuid',
-      operatorCallsign: 'W1BAD',
+  it('POST /nets/:netId/check-ins duplicate → 409 already_checked_in', async () => {
+    const res = await client.request(`/nets/${testNetId}/check-ins`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ciAuthToken}` },
+      body: JSON.stringify({ signal_report: '59' }),
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe('already_checked_in');
   });
 
-  it('POST /check-ins missing netId → 400 [FINDING: spec says 422]', async () => {
-    const res = await client.post('/check-ins', { operatorCallsign: 'W1BAD' });
-    expect(res.status).toBe(400);
+  it('POST /nets/nonexistent/check-ins → 404', async () => {
+    const res = await client.request('/nets/nonexistent/check-ins', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ciAuthToken}` },
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(404);
   });
 
-  it('GET /check-ins → 200 array', async () => {
+  it('POST /nets/:netId/check-ins without auth → 401', async () => {
+    const res = await client.post(`/nets/${testNetId}/check-ins`, {});
+    expect(res.status).toBe(401);
+  });
+
+  it('GET /check-ins → 200 array (generic route retained)', async () => {
     const res = await client.get('/check-ins');
     expect(res.status).toBe(200);
     expect(Array.isArray(await res.json())).toBe(true);
@@ -556,6 +576,12 @@ describe('REST API — /check-ins CRUD', () => {
     expect(body.every((ci: { netId: string }) => ci.netId === testNetId)).toBe(true);
   });
 
+  it('GET /nets/:netId/check-ins → 200 array', async () => {
+    const res = await client.get(`/nets/${testNetId}/check-ins`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(await res.json())).toBe(true);
+  });
+
   it('GET /check-ins/:id → 200', async () => {
     const res = await client.get(`/check-ins/${checkInId}`);
     expect(res.status).toBe(200);
@@ -566,19 +592,31 @@ describe('REST API — /check-ins CRUD', () => {
     expect((await client.get('/check-ins/nonexistent')).status).toBe(404);
   });
 
-  it('PATCH /check-ins/:id → 200', async () => {
-    const res = await client.patch(`/check-ins/${checkInId}`, { status: 'standby' });
+  it('PATCH /nets/:netId/check-ins/:id → 200 (net control)', async () => {
+    const res = await client.request(`/nets/${testNetId}/check-ins/${checkInId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ciAuthToken}` },
+      body: JSON.stringify({ signal_report: '58', remarks: 'Updated' }),
+    });
     expect(res.status).toBe(200);
-    expect((await res.json()).status).toBe('standby');
+    expect((await res.json()).signalReport).toBe('58');
   });
 
-  it('PATCH /check-ins/:id invalid status → 400 [FINDING: spec says 422]', async () => {
-    const res = await client.patch(`/check-ins/${checkInId}`, { status: 'gone' });
+  it('PATCH /nets/:netId/check-ins/:id invalid signal_report → 400 [FINDING: Hono validator returns 400]', async () => {
+    const res = await client.request(`/nets/${testNetId}/check-ins/${checkInId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ciAuthToken}` },
+      body: JSON.stringify({ signal_report: 'bad' }),
+    });
     expect(res.status).toBe(400);
   });
 
-  it('DELETE /check-ins/:id → 204', async () => {
-    expect((await client.delete(`/check-ins/${checkInId}`)).status).toBe(204);
+  it('DELETE /nets/:netId/check-ins/:id → 204 (net control)', async () => {
+    const res = await client.request(`/nets/${testNetId}/check-ins/${checkInId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${ciAuthToken}` },
+    });
+    expect(res.status).toBe(204);
   });
 
   it('GET /check-ins/:id after delete → 404', async () => {

@@ -1,14 +1,15 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/index.js';
-import { nets } from '../db/schema.js';
+import { nets, checkIns, operators } from '../db/schema.js';
 import { newId } from '../lib/ids.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const MODE_ENUM = ['FM', 'SSB', 'CW', 'DMR', 'D-STAR', 'FT8', 'other'] as const;
 const STATUS_ENUM = ['draft', 'open', 'closed'] as const;
+const TRAFFIC_TYPE_ENUM = ['routine', 'welfare', 'priority', 'emergency'] as const;
 
 // Frequency validated as a decimal string e.g. "146.520"
 const FrequencySchema = z
@@ -30,6 +31,24 @@ const UpdateNetSchema = z.object({
 });
 
 const ListStatusSchema = z.enum([...STATUS_ENUM, 'all']).default('open');
+
+// RST signal report: 2–3 digit string e.g. "59", "579"
+const SignalReportSchema = z
+  .string()
+  .regex(/^\d{2,3}$/, 'signal_report must be a 2–3 digit RST string');
+
+const CreateCheckInSchema = z.object({
+  signal_report: SignalReportSchema.optional(),
+  traffic_type: z.enum(TRAFFIC_TYPE_ENUM).default('routine'),
+  remarks: z.string().optional(),
+});
+
+const UpdateCheckInSchema = z.object({
+  signal_report: SignalReportSchema.optional(),
+  traffic_type: z.enum(TRAFFIC_TYPE_ENUM).optional(),
+  remarks: z.string().optional(),
+  acknowledged_at: z.string().datetime().optional(),
+});
 
 export const netsRouter = new Hono()
   // GET /nets — list nets, optional ?status= filter (default: open)
@@ -159,4 +178,119 @@ export const netsRouter = new Hono()
       .where(eq(nets.id, id))
       .returning();
     return c.json(updated);
+  })
+
+  // --- Net-scoped check-in routes ---
+
+  // GET /nets/:netId/check-ins — list check-ins for a net (optional auth)
+  .get('/:netId/check-ins', async (c) => {
+    const netId = c.req.param('netId') as string;
+    const [net] = await db.select().from(nets).where(eq(nets.id, netId)).limit(1);
+    if (!net) return c.json({ error: 'Net not found' }, 404);
+
+    const rows = await db.select().from(checkIns).where(eq(checkIns.netId, netId));
+    return c.json(rows);
+  })
+
+  // POST /nets/:netId/check-ins — check into an open net (auth required)
+  .post('/:netId/check-ins', requireAuth, zValidator('json', CreateCheckInSchema), async (c) => {
+    const netId = c.req.param('netId') as string;
+    const operatorId = c.get('operatorId') as string;
+    const callsign = c.get('callsign') as string;
+    const body = c.req.valid('json');
+
+    // Verify net exists and is open
+    const [net] = await db.select().from(nets).where(eq(nets.id, netId)).limit(1);
+    if (!net) return c.json({ error: 'Net not found' }, 404);
+    if (net.status !== 'open') {
+      return c.json({ error: 'net_not_open' }, 409);
+    }
+
+    // Enforce unique check-in per operator per net
+    const [existing] = await db
+      .select({ id: checkIns.id })
+      .from(checkIns)
+      .where(and(eq(checkIns.netId, netId), eq(checkIns.operatorId, operatorId)))
+      .limit(1);
+    if (existing) {
+      return c.json({ error: 'already_checked_in' }, 409);
+    }
+
+    const now = new Date().toISOString();
+    const [created] = await db
+      .insert(checkIns)
+      .values({
+        id: newId(),
+        netId,
+        operatorId,
+        operatorCallsign: callsign,
+        trafficType: body.traffic_type,
+        signalReport: body.signal_report,
+        remarks: body.remarks,
+        checkedInAt: now,
+        updatedAt: now,
+      })
+      .returning();
+    return c.json(created, 201);
+  })
+
+  // PATCH /nets/:netId/check-ins/:id — update check-in (auth required, net control only)
+  .patch('/:netId/check-ins/:id', requireAuth, zValidator('json', UpdateCheckInSchema), async (c) => {
+    const netId = c.req.param('netId') as string;
+    const checkInId = c.req.param('id') as string;
+    const operatorId = c.get('operatorId') as string;
+    const body = c.req.valid('json');
+
+    // Verify net exists
+    const [net] = await db.select().from(nets).where(eq(nets.id, netId)).limit(1);
+    if (!net) return c.json({ error: 'Net not found' }, 404);
+
+    // Only net control may update check-ins
+    if (net.netControlId !== operatorId) {
+      return c.json({ error: 'Forbidden: only the net control operator may update check-ins' }, 403);
+    }
+
+    const [checkIn] = await db
+      .select()
+      .from(checkIns)
+      .where(and(eq(checkIns.id, checkInId), eq(checkIns.netId, netId)))
+      .limit(1);
+    if (!checkIn) return c.json({ error: 'Check-in not found' }, 404);
+
+    const now = new Date().toISOString();
+    const updates: Record<string, unknown> = { updatedAt: now };
+    if (body.signal_report !== undefined) updates.signalReport = body.signal_report;
+    if (body.traffic_type !== undefined) updates.trafficType = body.traffic_type;
+    if (body.remarks !== undefined) updates.remarks = body.remarks;
+    if (body.acknowledged_at !== undefined) updates.acknowledgedAt = body.acknowledged_at;
+
+    const [updated] = await db
+      .update(checkIns)
+      .set(updates)
+      .where(eq(checkIns.id, checkInId))
+      .returning();
+    return c.json(updated);
+  })
+
+  // DELETE /nets/:netId/check-ins/:id — remove a check-in (auth required, net control only)
+  .delete('/:netId/check-ins/:id', requireAuth, async (c) => {
+    const netId = c.req.param('netId') as string;
+    const checkInId = c.req.param('id') as string;
+    const operatorId = c.get('operatorId') as string;
+
+    // Verify net exists
+    const [net] = await db.select().from(nets).where(eq(nets.id, netId)).limit(1);
+    if (!net) return c.json({ error: 'Net not found' }, 404);
+
+    // Only net control may remove check-ins
+    if (net.netControlId !== operatorId) {
+      return c.json({ error: 'Forbidden: only the net control operator may remove check-ins' }, 403);
+    }
+
+    const [deleted] = await db
+      .delete(checkIns)
+      .where(and(eq(checkIns.id, checkInId), eq(checkIns.netId, netId)))
+      .returning();
+    if (!deleted) return c.json({ error: 'Check-in not found' }, 404);
+    return c.body(null, 204);
   });

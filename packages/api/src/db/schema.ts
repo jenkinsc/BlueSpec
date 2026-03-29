@@ -50,11 +50,14 @@ export const checkIns = sqliteTable('check_ins', {
   netId: text('net_id')
     .notNull()
     .references(() => nets.id),
+  operatorId: text('operator_id').references(() => operators.id), // FK from JWT (added M2)
   operatorCallsign: text('operator_callsign').notNull(),
   status: text('status').notNull().default('active'), // 'active' | 'standby' | 'signed_off'
   trafficCount: integer('traffic_count').notNull().default(0),
-  signalReport: text('signal_report'), // e.g. "5-9", "5-7"
+  trafficType: text('traffic_type').notNull().default('routine'), // 'routine' | 'welfare' | 'priority' | 'emergency'
+  signalReport: text('signal_report'), // RST scale e.g. "59", "579"
   remarks: text('remarks'),
+  acknowledgedAt: text('acknowledged_at'),
   checkedInAt: text('checked_in_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 });
