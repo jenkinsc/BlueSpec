@@ -1,14 +1,21 @@
 {
-  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "tsBuildInfoFile": "./dist/.tsbuildinfo",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"]
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "allowImportingTsExtensions": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "esModuleInterop": true
   },
-  "references": [
-    { "path": "../shared" }
-  ],
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "vite.config.ts"],
   "exclude": ["node_modules", "dist"]
 }
