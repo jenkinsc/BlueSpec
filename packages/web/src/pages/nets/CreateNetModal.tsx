@@ -1,8 +1,15 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '../../lib/api.js';
+
+interface Template {
+  id: string;
+  name: string;
+  frequency: string;
+  mode: string;
+}
 
 const MODES = ['FM', 'SSB', 'CW', 'DMR', 'D-STAR', 'FT8', 'other'] as const;
 
@@ -38,15 +45,29 @@ interface Props {
 export function CreateNetModal({ onClose, onCreated }: Props) {
   const queryClient = useQueryClient();
 
+  const templatesQuery = useQuery<Template[]>({
+    queryKey: ['templates'],
+    queryFn: () => apiFetch<Template[]>('/templates'),
+  });
+
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
     setError,
+    setValue,
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { mode: 'FM' },
   });
+
+  const handleTemplateSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const tpl = templatesQuery.data?.find((t) => t.id === e.target.value);
+    if (!tpl) return;
+    setValue('name', tpl.name);
+    setValue('frequency', tpl.frequency);
+    setValue('mode', tpl.mode as typeof MODES[number]);
+  };
 
   const mutation = useMutation({
     mutationFn: (values: FormValues) =>
@@ -89,6 +110,30 @@ export function CreateNetModal({ onClose, onCreated }: Props) {
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {/* Template selector */}
+          {templatesQuery.data && templatesQuery.data.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Load from template{' '}
+                <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <select
+                onChange={handleTemplateSelect}
+                defaultValue=""
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="" disabled>
+                  Select a template…
+                </option>
+                {templatesQuery.data.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name} — {t.frequency} {t.mode}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">

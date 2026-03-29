@@ -6,6 +6,8 @@ import { LoginPage } from './pages/LoginPage.tsx';
 import { PlaceholderPage } from './pages/PlaceholderPage.tsx';
 import { NetListPage } from './pages/nets/NetListPage.tsx';
 import { NetSessionPage } from './pages/nets/NetSessionPage.tsx';
+import { TemplateListPage } from './pages/templates/TemplateListPage.tsx';
+import { TemplateFormPage } from './pages/templates/TemplateFormPage.tsx';
 
 export function App() {
   return (
@@ -24,10 +26,9 @@ export function App() {
                 path="nets/:id/summary"
                 element={<PlaceholderPage title="Net Summary" />}
               />
-              <Route
-                path="templates"
-                element={<PlaceholderPage title="Net Templates" />}
-              />
+              <Route path="templates" element={<TemplateListPage />} />
+              <Route path="templates/new" element={<TemplateFormPage />} />
+              <Route path="templates/:id/edit" element={<TemplateFormPage />} />
               <Route
                 path="incidents"
                 element={<PlaceholderPage title="Incidents" />}
