@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { serveStatic } from '@hono/node-server/serve-static';
+import { sql } from 'drizzle-orm';
 import { operatorsRouter } from './routes/operators.js';
 import { incidentsRouter } from './routes/incidents.js';
 import { netsRouter } from './routes/nets.js';
@@ -11,13 +12,24 @@ import { uiRouter, dashboardRoute } from './routes/ui.js';
 import { requestLogger } from './middleware/logger.js';
 import { errorHandler } from './middleware/error.js';
 import { openApiSpec } from './openapi.js';
+import { db } from './db/index.js';
 
 export function createApp() {
   const app = new Hono();
 
   app.use('*', requestLogger);
 
-  app.get('/health', (c) => c.json({ status: 'ok' }));
+  app.get('/health', async (c) => {
+    let dbStatus: 'ok' | 'error' = 'ok';
+    try {
+      await db.run(sql`SELECT 1`);
+    } catch {
+      dbStatus = 'error';
+    }
+    const version = process.env.npm_package_version ?? '0.0.0';
+    const status = dbStatus === 'ok' ? 'ok' : 'degraded';
+    return c.json({ status, version, db: dbStatus }, dbStatus === 'ok' ? 200 : 503);
+  });
   app.get('/openapi.json', (c) => c.json(openApiSpec));
 
   // Auth (public)
