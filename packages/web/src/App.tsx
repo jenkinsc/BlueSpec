@@ -5,6 +5,7 @@ import { ProtectedRoute } from './components/ProtectedRoute.tsx';
 import { LoginPage } from './pages/LoginPage.tsx';
 import { PlaceholderPage } from './pages/PlaceholderPage.tsx';
 import { NetListPage } from './pages/nets/NetListPage.tsx';
+import { NetSessionPage } from './pages/nets/NetSessionPage.tsx';
 
 export function App() {
   return (
@@ -17,7 +18,7 @@ export function App() {
               <Route index element={<NetListPage />} />
               <Route
                 path="nets/:id"
-                element={<PlaceholderPage title="Live Net Session" />}
+                element={<NetSessionPage />}
               />
               <Route
                 path="nets/:id/summary"
