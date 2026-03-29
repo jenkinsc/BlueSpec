@@ -150,7 +150,7 @@ export const dashboardRoute = new Hono().get('/', (c) =>
         fetch('/nets', { headers })
           .then(r => r.json())
           .then(nets => {
-            const active = nets.filter(n => n.status === 'active');
+            const active = nets.filter(n => n.status === 'open');
             document.getElementById('nets-list').innerHTML = active.length
               ? active.map(n => \`<div class="card"><strong>\${n.name}</strong> &nbsp;<span class="badge badge-active">\${n.status}</span><br><small>\${n.frequency} MHz \${n.mode} — NCS: \${n.netControl}</small></div>\`).join('')
               : '<p>No active nets.</p>';

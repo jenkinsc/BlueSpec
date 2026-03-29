@@ -47,7 +47,7 @@ export function CreateNetModal({ onClose, onCreated }: Props) {
 
   const templatesQuery = useQuery<Template[]>({
     queryKey: ['templates'],
-    queryFn: () => apiFetch<Template[]>('/templates'),
+    queryFn: () => apiFetch<Template[]>('/api/templates'),
   });
 
   const {

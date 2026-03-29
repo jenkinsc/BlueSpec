@@ -37,7 +37,7 @@ export function TemplateFormPage() {
 
   const existingQuery = useQuery<Template>({
     queryKey: ['template', id],
-    queryFn: () => apiFetch<Template>(`/templates/${id}`),
+    queryFn: () => apiFetch<Template>(`/api/templates/${id}`),
     enabled: isEdit,
   });
 
@@ -68,12 +68,12 @@ export function TemplateFormPage() {
   const mutation = useMutation({
     mutationFn: (values: FormValues) => {
       if (isEdit) {
-        return apiFetch<Template>(`/templates/${id}`, {
+        return apiFetch<Template>(`/api/templates/${id}`, {
           method: 'PATCH',
           body: JSON.stringify(values),
         });
       }
-      return apiFetch<Template>('/templates', {
+      return apiFetch<Template>('/api/templates', {
         method: 'POST',
         body: JSON.stringify(values),
       });

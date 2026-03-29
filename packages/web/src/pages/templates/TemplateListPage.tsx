@@ -77,12 +77,12 @@ export function TemplateListPage() {
 
   const { data: templates, isLoading, isError } = useQuery<Template[]>({
     queryKey: ['templates'],
-    queryFn: () => apiFetch<Template[]>('/templates'),
+    queryFn: () => apiFetch<Template[]>('/api/templates'),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) =>
-      apiFetch<void>(`/templates/${id}`, { method: 'DELETE' }),
+      apiFetch<void>(`/api/templates/${id}`, { method: 'DELETE' }),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['templates'] }),
   });
 

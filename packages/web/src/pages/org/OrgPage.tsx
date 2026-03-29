@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '../../lib/api.js';
 import { useAuth } from '../../lib/auth.tsx';
@@ -44,7 +44,7 @@ function CreateOrgModal({
 
   const mutation = useMutation({
     mutationFn: () =>
-      apiFetch<OrgSummary>('/organizations', {
+      apiFetch<OrgSummary>('/api/organizations', {
         method: 'POST',
         body: JSON.stringify({ name, callsign: callsign || undefined }),
       }),
@@ -119,7 +119,7 @@ function InviteForm({ orgId }: { orgId: string }) {
 
   const mutation = useMutation({
     mutationFn: () =>
-      apiFetch<Member>(`/organizations/${orgId}/members`, {
+      apiFetch<Member>(`/api/organizations/${orgId}/members`, {
         method: 'POST',
         body: JSON.stringify({ callsign: callsign.toUpperCase(), role }),
       }),
@@ -188,7 +188,7 @@ function MemberRow({
 
   const removeMutation = useMutation({
     mutationFn: () =>
-      apiFetch<void>(`/organizations/${orgId}/members/${member.operatorId}`, {
+      apiFetch<void>(`/api/organizations/${orgId}/members/${member.operatorId}`, {
         method: 'DELETE',
       }),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['org', orgId] }),
@@ -250,7 +250,7 @@ function MemberRow({
 function OrgDetailPanel({ orgId, callerCallsign }: { orgId: string; callerCallsign: string }) {
   const { data: org, isLoading, isError } = useQuery<OrgDetail>({
     queryKey: ['org', orgId],
-    queryFn: () => apiFetch<OrgDetail>(`/organizations/${orgId}`),
+    queryFn: () => apiFetch<OrgDetail>(`/api/organizations/${orgId}`),
   });
 
   if (isLoading) return <p className="text-sm text-gray-400 text-center py-8">Loading…</p>;
@@ -302,16 +302,15 @@ export function OrgPage() {
 
   const { data: orgs, isLoading, isError } = useQuery<OrgSummary[]>({
     queryKey: ['orgs'],
-    queryFn: () => apiFetch<OrgSummary[]>('/organizations'),
-    onSuccess: (data) => {
-      // Auto-select first org if nothing selected
-      if (!selectedOrgId && data.length > 0) {
-        setSelectedOrgId(data[0].id);
-      }
-    },
-  } as Parameters<typeof useQuery<OrgSummary[]>>[0]);
+    queryFn: () => apiFetch<OrgSummary[]>('/api/organizations'),
+  });
 
-  // Auto-select first org
+  useEffect(() => {
+    if (!selectedOrgId && orgs && orgs.length > 0) {
+      setSelectedOrgId(orgs[0].id);
+    }
+  }, [orgs, selectedOrgId]);
+
   const effectiveOrgId =
     selectedOrgId ?? (orgs && orgs.length > 0 ? orgs[0].id : null);
 
