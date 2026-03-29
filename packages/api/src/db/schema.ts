@@ -78,6 +78,27 @@ export const incidentActivities = sqliteTable('incident_activities', {
   createdAt: text('created_at').notNull(),
 });
 
+// Organizations — groups of operators
+export const organizations = sqliteTable('organizations', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  callsign: text('callsign'),
+  createdAt: text('created_at').notNull(),
+});
+
+// Organization members
+export const organizationMembers = sqliteTable('organization_members', {
+  id: text('id').primaryKey(),
+  organizationId: text('organization_id')
+    .notNull()
+    .references(() => organizations.id, { onDelete: 'cascade' }),
+  operatorId: text('operator_id')
+    .notNull()
+    .references(() => operators.id),
+  role: text('role').notNull().default('member'), // 'admin' | 'member'
+  joinedAt: text('joined_at').notNull(),
+});
+
 // Net templates — reusable net configuration presets
 export const netTemplates = sqliteTable('net_templates', {
   id: text('id').primaryKey(),
@@ -103,3 +124,7 @@ export type IncidentActivityRow = typeof incidentActivities.$inferSelect;
 export type NewIncidentActivityRow = typeof incidentActivities.$inferInsert;
 export type NetTemplateRow = typeof netTemplates.$inferSelect;
 export type NewNetTemplateRow = typeof netTemplates.$inferInsert;
+export type OrganizationRow = typeof organizations.$inferSelect;
+export type NewOrganizationRow = typeof organizations.$inferInsert;
+export type OrganizationMemberRow = typeof organizationMembers.$inferSelect;
+export type NewOrganizationMemberRow = typeof organizationMembers.$inferInsert;
