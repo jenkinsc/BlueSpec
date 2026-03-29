@@ -11,7 +11,4 @@ node_modules
 .gitignore
 *.md
 packages/api/drizzle
-packages/web/src
-packages/api/src
-packages/shared/src
 public
