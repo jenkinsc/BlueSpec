@@ -380,6 +380,7 @@ export function NetSessionPage() {
     onSuccess: (updated) => {
       queryClient.setQueryData(['net', id], updated);
       void queryClient.invalidateQueries({ queryKey: ['nets'] });
+      navigate(`/nets/${id}/summary`);
     },
   });
 

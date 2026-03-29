@@ -3,13 +3,14 @@ import { AuthProvider } from './lib/auth.tsx';
 import { AppShell } from './components/AppShell.tsx';
 import { ProtectedRoute } from './components/ProtectedRoute.tsx';
 import { LoginPage } from './pages/LoginPage.tsx';
-import { PlaceholderPage } from './pages/PlaceholderPage.tsx';
 import { NetListPage } from './pages/nets/NetListPage.tsx';
 import { NetSessionPage } from './pages/nets/NetSessionPage.tsx';
+import { NetSummaryPage } from './pages/nets/NetSummaryPage.tsx';
 import { TemplateListPage } from './pages/templates/TemplateListPage.tsx';
 import { TemplateFormPage } from './pages/templates/TemplateFormPage.tsx';
 import { IncidentListPage } from './pages/incidents/IncidentListPage.tsx';
 import { IncidentDetailPage } from './pages/incidents/IncidentDetailPage.tsx';
+import { PlaceholderPage } from './pages/PlaceholderPage.tsx';
 
 export function App() {
   return (
@@ -24,10 +25,7 @@ export function App() {
                 path="nets/:id"
                 element={<NetSessionPage />}
               />
-              <Route
-                path="nets/:id/summary"
-                element={<PlaceholderPage title="Net Summary" />}
-              />
+              <Route path="nets/:id/summary" element={<NetSummaryPage />} />
               <Route path="templates" element={<TemplateListPage />} />
               <Route path="templates/new" element={<TemplateFormPage />} />
               <Route path="templates/:id/edit" element={<TemplateFormPage />} />
