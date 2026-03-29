@@ -8,6 +8,8 @@ import { NetListPage } from './pages/nets/NetListPage.tsx';
 import { NetSessionPage } from './pages/nets/NetSessionPage.tsx';
 import { TemplateListPage } from './pages/templates/TemplateListPage.tsx';
 import { TemplateFormPage } from './pages/templates/TemplateFormPage.tsx';
+import { IncidentListPage } from './pages/incidents/IncidentListPage.tsx';
+import { IncidentDetailPage } from './pages/incidents/IncidentDetailPage.tsx';
 
 export function App() {
   return (
@@ -29,10 +31,8 @@ export function App() {
               <Route path="templates" element={<TemplateListPage />} />
               <Route path="templates/new" element={<TemplateFormPage />} />
               <Route path="templates/:id/edit" element={<TemplateFormPage />} />
-              <Route
-                path="incidents"
-                element={<PlaceholderPage title="Incidents" />}
-              />
+              <Route path="incidents" element={<IncidentListPage />} />
+              <Route path="incidents/:id" element={<IncidentDetailPage />} />
               <Route
                 path="org"
                 element={<PlaceholderPage title="Organization" />}

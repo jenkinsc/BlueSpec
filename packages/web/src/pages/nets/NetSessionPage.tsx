@@ -4,6 +4,61 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '../../lib/api.js';
 import { useAuth } from '../../lib/auth.tsx';
 
+// --- Incident sidebar types ---
+interface Incident {
+  id: string;
+  title: string;
+  status: string;
+  incidentType: string | null;
+}
+
+function IncidentSidebar({ netId }: { netId: string }) {
+  const navigate = useNavigate();
+  const [collapsed, setCollapsed] = useState(false);
+
+  const { data: incidents } = useQuery<Incident[]>({
+    queryKey: ['incidents-net', netId],
+    queryFn: () => apiFetch<Incident[]>(`/api/incidents?netId=${netId}&status=active`),
+    refetchInterval: 30_000,
+  });
+
+  const count = incidents?.length ?? 0;
+
+  return (
+    <div className="border-b border-orange-200 bg-orange-50">
+      <button
+        onClick={() => setCollapsed((v) => !v)}
+        className="w-full flex items-center justify-between px-4 py-2 text-xs font-medium text-orange-700"
+      >
+        <span>
+          Active Incidents{count > 0 ? ` (${count})` : ''}
+        </span>
+        <span>{collapsed ? '▾' : '▴'}</span>
+      </button>
+      {!collapsed && (
+        <div className="px-4 pb-2">
+          {count === 0 ? (
+            <p className="text-xs text-orange-500">No active incidents linked to this net.</p>
+          ) : (
+            <ul className="space-y-1">
+              {incidents!.map((i) => (
+                <li key={i.id}>
+                  <button
+                    onClick={() => navigate(`/incidents/${i.id}`)}
+                    className="text-xs text-orange-800 hover:underline text-left"
+                  >
+                    {i.title}{i.incidentType ? ` — ${i.incidentType}` : ''}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface NetRow {
   id: string;
   name: string;
@@ -377,6 +432,9 @@ export function NetSessionPage() {
         onCloseNet={() => closeMutation.mutate()}
         closing={closeMutation.isPending}
       />
+
+      {/* Incident sidebar */}
+      <IncidentSidebar netId={id!} />
 
       {/* Back link */}
       <div className="px-4 pt-2 pb-1">
