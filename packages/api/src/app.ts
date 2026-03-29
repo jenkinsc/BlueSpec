@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { serveStatic } from '@hono/node-server/serve-static';
 import { operatorsRouter } from './routes/operators.js';
 import { incidentsRouter } from './routes/incidents.js';
 import { netsRouter } from './routes/nets.js';
@@ -33,6 +34,20 @@ export function createApp() {
   app.route('/check-ins', checkInsRouter);
   app.route('/templates', templatesRouter);
   app.route('/organizations', organizationsRouter);
+
+  // Also mount under /api prefix for React SPA compatibility in production
+  const apiRouter = new Hono()
+    .route('/operators', operatorsRouter)
+    .route('/incidents', incidentsRouter)
+    .route('/nets', netsRouter)
+    .route('/check-ins', checkInsRouter)
+    .route('/templates', templatesRouter)
+    .route('/organizations', organizationsRouter);
+  app.route('/api', apiRouter);
+
+  // Serve React SPA static assets from ./public (populated in production Docker build)
+  app.use('/*', serveStatic({ root: './public' }));
+  app.use('/*', serveStatic({ path: './public/index.html' }));
 
   app.onError(errorHandler);
 

@@ -1,0 +1,17 @@
+node_modules
+**/node_modules
+**/dist
+**/*.db
+**/*.db-shm
+**/*.db-wal
+.env
+.env.*
+!.env.example
+.git
+.gitignore
+*.md
+packages/api/drizzle
+packages/web/src
+packages/api/src
+packages/shared/src
+public

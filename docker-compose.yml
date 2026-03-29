@@ -1,0 +1,37 @@
+services:
+  api:
+    build:
+      context: .
+      target: deps
+    working_dir: /app
+    command: npm run dev:api
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./packages/api:/app/packages/api
+      - ./packages/shared:/app/packages/shared
+      - ./node_modules:/app/node_modules
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - DATABASE_URL=file:emcomm.db
+      - JWT_SECRET=${JWT_SECRET:-emcomm-dev-secret-change-in-production}
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      target: deps
+    working_dir: /app
+    command: npm run dev:web
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./packages/web:/app/packages/web
+      - ./packages/shared:/app/packages/shared
+      - ./node_modules:/app/node_modules
+    environment:
+      - NODE_ENV=development
+    depends_on:
+      - api
+    restart: unless-stopped
