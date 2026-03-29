@@ -1,0 +1,20 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1774811402469,
+      "tag": "0000_tired_proteus",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1743278400000,
+      "tag": "0001_net_management_m2",
+      "breakpoints": true
+    }
+  ]
+}
