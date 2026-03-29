@@ -1,0 +1,35 @@
+{
+  "name": "@emcomm/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc --build",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-vm-modules ../../node_modules/.bin/jest",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "db:seed": "tsx src/db/seed.ts",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "@emcomm/shared": "*",
+    "@hono/node-server": "^1.9.0",
+    "@hono/zod-validator": "^0.2.1",
+    "@libsql/client": "^0.6.2",
+    "bcryptjs": "^2.4.3",
+    "drizzle-orm": "^0.30.8",
+    "hono": "^4.2.2",
+    "jose": "^5.2.4",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jest": "^29.5.12",
+    "drizzle-kit": "^0.21.1",
+    "tsx": "^4.7.0"
+  }
+}

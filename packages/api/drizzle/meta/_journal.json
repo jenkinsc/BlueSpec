@@ -22,6 +22,13 @@
       "when": 1743364800000,
       "tag": "0002_checkin_flow_m2",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1743451200000,
+      "tag": "0003_incident_tracking_m2",
+      "breakpoints": true
     }
   ]
 }

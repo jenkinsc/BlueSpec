@@ -423,33 +423,79 @@ describe('REST API — /nets CRUD', () => {
   });
 });
 
-// ─── REST API: Incidents CRUD ─────────────────────────────────────────────────
+// ─── REST API: Incidents CRUD (M2) ───────────────────────────────────────────
+// M2 incident model: auth required for create/update, new fields, status transitions
 
-describe('REST API — /incidents CRUD', () => {
+describe('REST API — /incidents CRUD (M2)', () => {
   let incidentId: string;
+  let incAuthToken: string;
+  let otherToken: string;
 
-  it('POST /incidents → 201', async () => {
+  beforeAll(async () => {
+    const cs1 = uniqueCallsign();
+    const cs2 = uniqueCallsign();
+    await register(cs1);
+    await register(cs2);
+    incAuthToken = (await (await login(cs1)).json()).token;
+    otherToken = (await (await login(cs2)).json()).token;
+  });
+
+  it('POST /incidents without auth → 401', async () => {
     const res = await client.post('/incidents', {
-      title: 'QA Test Incident',
-      severity: 'routine',
+      title: 'No Auth Incident',
+      incident_type: 'fire',
+      activation_level: 1,
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('POST /incidents missing incident_type → 400', async () => {
+    const res = await client.request('/incidents', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${incAuthToken}` },
+      body: JSON.stringify({ title: 'No Type', activation_level: 1 }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('POST /incidents missing title → 400', async () => {
+    const res = await client.request('/incidents', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${incAuthToken}` },
+      body: JSON.stringify({ incident_type: 'fire', activation_level: 1 }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('POST /incidents invalid activation_level → 400', async () => {
+    const res = await client.request('/incidents', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${incAuthToken}` },
+      body: JSON.stringify({ title: 'Bad Level', incident_type: 'fire', activation_level: 5 }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('POST /incidents with auth → 201, status=reported, createdByOperatorId set', async () => {
+    const res = await client.request('/incidents', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${incAuthToken}` },
+      body: JSON.stringify({
+        title: 'Structure fire — 4th and Main',
+        incident_type: 'fire',
+        activation_level: 2,
+        served_agency: 'Clark County Fire',
+      }),
     });
     expect(res.status).toBe(201);
     const body = await res.json();
-    expect(body.title).toBe('QA Test Incident');
+    expect(body.title).toBe('Structure fire — 4th and Main');
+    expect(body.status).toBe('reported');
+    expect(body.incidentType).toBe('fire');
+    expect(body.activationLevel).toBe(2);
+    expect(body.servedAgency).toBe('Clark County Fire');
+    expect(body.createdByOperatorId).toBeTruthy();
     incidentId = body.id;
-  });
-
-  it('POST /incidents invalid severity → 400 [FINDING: spec says 422]', async () => {
-    const res = await client.post('/incidents', {
-      title: 'Bad Incident',
-      severity: 'catastrophic',
-    });
-    expect(res.status).toBe(400);
-  });
-
-  it('POST /incidents missing title → 400 [FINDING: spec says 422]', async () => {
-    const res = await client.post('/incidents', { severity: 'routine' });
-    expect(res.status).toBe(400);
   });
 
   it('GET /incidents → 200 array', async () => {
@@ -458,41 +504,189 @@ describe('REST API — /incidents CRUD', () => {
     expect(Array.isArray(await res.json())).toBe(true);
   });
 
-  it('GET /incidents/:id → 200', async () => {
+  it('GET /incidents?status=reported → 200 filtered array', async () => {
+    const res = await client.get('/incidents?status=reported');
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(Array.isArray(body)).toBe(true);
+    expect(body.every((i: { status: string }) => i.status === 'reported')).toBe(true);
+  });
+
+  it('GET /incidents?status=invalid → 400', async () => {
+    const res = await client.get('/incidents?status=unknown');
+    expect(res.status).toBe(400);
+  });
+
+  it('GET /incidents/:id → 200 with activities array', async () => {
     const res = await client.get(`/incidents/${incidentId}`);
     expect(res.status).toBe(200);
-    expect((await res.json()).id).toBe(incidentId);
+    const body = await res.json();
+    expect(body.id).toBe(incidentId);
+    expect(Array.isArray(body.activities)).toBe(true);
   });
 
   it('GET /incidents/:id non-existent → 404', async () => {
     expect((await client.get('/incidents/nonexistent')).status).toBe(404);
   });
 
-  it('PATCH /incidents/:id → 200', async () => {
-    const res = await client.patch(`/incidents/${incidentId}`, { severity: 'urgent' });
-    expect(res.status).toBe(200);
-    expect((await res.json()).severity).toBe('urgent');
+  it('PATCH /incidents/:id without auth → 401', async () => {
+    const res = await client.patch(`/incidents/${incidentId}`, { title: 'No Auth' });
+    expect(res.status).toBe(401);
   });
 
-  it('PATCH /incidents/:id status=resolved → sets resolvedAt automatically', async () => {
-    const res = await client.patch(`/incidents/${incidentId}`, { status: 'resolved' });
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.status).toBe('resolved');
-    expect(body.resolvedAt).toBeTruthy();
+  it('PATCH /incidents/:id by non-creator → 403', async () => {
+    const res = await client.request(`/incidents/${incidentId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${otherToken}` },
+      body: JSON.stringify({ title: 'Stolen' }),
+    });
+    expect(res.status).toBe(403);
   });
 
-  it('PATCH /incidents/:id invalid status → 400 [FINDING: spec says 422]', async () => {
-    const res = await client.patch(`/incidents/${incidentId}`, { status: 'unknown' });
+  it('PATCH /incidents/:id invalid status → 400', async () => {
+    const res = await client.request(`/incidents/${incidentId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${incAuthToken}` },
+      body: JSON.stringify({ status: 'open' }),
+    });
     expect(res.status).toBe(400);
   });
 
-  it('DELETE /incidents/:id → 204', async () => {
-    expect((await client.delete(`/incidents/${incidentId}`)).status).toBe(204);
+  it('PATCH /incidents/:id reported → active → 200', async () => {
+    const res = await client.request(`/incidents/${incidentId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${incAuthToken}` },
+      body: JSON.stringify({ status: 'active' }),
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).status).toBe('active');
   });
 
-  it('GET /incidents/:id after delete → 404', async () => {
-    expect((await client.get(`/incidents/${incidentId}`)).status).toBe(404);
+  it('PATCH /incidents/:id active → reported (backwards) → 409', async () => {
+    const res = await client.request(`/incidents/${incidentId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${incAuthToken}` },
+      body: JSON.stringify({ status: 'reported' }),
+    });
+    expect(res.status).toBe(409);
+  });
+
+  it('PATCH /incidents/:id active → resolved → 200', async () => {
+    const res = await client.request(`/incidents/${incidentId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${incAuthToken}` },
+      body: JSON.stringify({ status: 'resolved' }),
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).status).toBe('resolved');
+  });
+
+  it('PATCH /incidents/:id resolved → any status → 409 (terminal)', async () => {
+    const res = await client.request(`/incidents/${incidentId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${incAuthToken}` },
+      body: JSON.stringify({ status: 'active' }),
+    });
+    expect(res.status).toBe(409);
+  });
+});
+
+// ─── M2: Incident activities ──────────────────────────────────────────────────
+
+describe('M2 — Incident activities', () => {
+  let actIncidentId: string;
+  let activityId: string;
+  let actAuthToken: string;
+
+  beforeAll(async () => {
+    const cs = uniqueCallsign();
+    await register(cs);
+    actAuthToken = (await (await login(cs)).json()).token;
+
+    const res = await client.request('/incidents', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${actAuthToken}` },
+      body: JSON.stringify({ title: 'Activity Test Incident', incident_type: 'search_rescue', activation_level: 1 }),
+    });
+    actIncidentId = (await res.json()).id;
+  });
+
+  it('POST /incidents/:id/activities without auth → 401', async () => {
+    const res = await client.post(`/incidents/${actIncidentId}/activities`, { note: 'No auth' });
+    expect(res.status).toBe(401);
+  });
+
+  it('POST /incidents/nonexistent/activities → 404', async () => {
+    const res = await client.request('/incidents/nonexistent/activities', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${actAuthToken}` },
+      body: JSON.stringify({ note: 'Ghost' }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it('POST /incidents/:id/activities missing note → 400', async () => {
+    const res = await client.request(`/incidents/${actIncidentId}/activities`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${actAuthToken}` },
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('POST /incidents/:id/activities with auth → 201', async () => {
+    const res = await client.request(`/incidents/${actIncidentId}/activities`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${actAuthToken}` },
+      body: JSON.stringify({ note: 'ICS 205 distributed. 6 operators on tactical channel.' }),
+    });
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.incidentId).toBe(actIncidentId);
+    expect(body.note).toBe('ICS 205 distributed. 6 operators on tactical channel.');
+    expect(body.operatorId).toBeTruthy();
+    expect(body.createdAt).toBeTruthy();
+    activityId = body.id;
+  });
+
+  it('GET /incidents/:id/activities → 200 array (chronological)', async () => {
+    const res = await client.get(`/incidents/${actIncidentId}/activities`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(Array.isArray(body)).toBe(true);
+    expect(body.length).toBeGreaterThan(0);
+    expect(body[0].id).toBe(activityId);
+  });
+
+  it('GET /incidents/:id/activities non-existent incident → 404', async () => {
+    expect((await client.get('/incidents/nonexistent/activities')).status).toBe(404);
+  });
+
+  it('GET /incidents/:id includes activities inline', async () => {
+    const res = await client.get(`/incidents/${actIncidentId}`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(Array.isArray(body.activities)).toBe(true);
+    expect(body.activities.length).toBeGreaterThan(0);
+    expect(body.activities[0].note).toBe('ICS 205 distributed. 6 operators on tactical channel.');
+  });
+
+  it('M2 — cancelled status reachable from reported', async () => {
+    // Create a fresh incident and cancel it directly from reported
+    const createRes = await client.request('/incidents', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${actAuthToken}` },
+      body: JSON.stringify({ title: 'Cancel Test', incident_type: 'drill', activation_level: 1 }),
+    });
+    const { id } = await createRes.json();
+
+    const cancelRes = await client.request(`/incidents/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${actAuthToken}` },
+      body: JSON.stringify({ status: 'cancelled' }),
+    });
+    expect(cancelRes.status).toBe(200);
+    expect((await cancelRes.json()).status).toBe('cancelled');
   });
 });
 

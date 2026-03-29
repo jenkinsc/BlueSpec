@@ -18,12 +18,19 @@ export const incidents = sqliteTable('incidents', {
   id: text('id').primaryKey(),
   title: text('title').notNull(),
   description: text('description'),
-  severity: text('severity').notNull(), // 'routine' | 'urgent' | 'emergency'
-  status: text('status').notNull().default('open'), // 'open' | 'monitoring' | 'resolved'
+  severity: text('severity'), // M1 legacy field (unused in M2)
+  // M2 status: 'reported' | 'active' | 'resolved' | 'cancelled'
+  status: text('status').notNull().default('reported'),
   location: text('location'),
+  // M2 fields
+  incidentType: text('incident_type'),
+  activationLevel: integer('activation_level'), // 1=local, 2=regional, 3=state/federal
+  servedAgency: text('served_agency'),
+  netId: text('net_id'), // FK to nets(id) enforced by migration; no Drizzle ref to avoid circular
+  createdByOperatorId: text('created_by_operator_id').references(() => operators.id),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
-  resolvedAt: text('resolved_at'),
+  resolvedAt: text('resolved_at'), // M1 legacy field
 });
 
 // Nets — radio nets (scheduled or ad-hoc)
@@ -62,6 +69,15 @@ export const checkIns = sqliteTable('check_ins', {
   updatedAt: text('updated_at').notNull(),
 });
 
+// Incident activity log — append-only entries tracking real-time status
+export const incidentActivities = sqliteTable('incident_activities', {
+  id: text('id').primaryKey(),
+  incidentId: text('incident_id').notNull().references(() => incidents.id),
+  operatorId: text('operator_id').notNull().references(() => operators.id),
+  note: text('note').notNull(),
+  createdAt: text('created_at').notNull(),
+});
+
 export type OperatorRow = typeof operators.$inferSelect;
 export type NewOperatorRow = typeof operators.$inferInsert;
 export type IncidentRow = typeof incidents.$inferSelect;
@@ -70,3 +86,5 @@ export type NetRow = typeof nets.$inferSelect;
 export type NewNetRow = typeof nets.$inferInsert;
 export type CheckInRow = typeof checkIns.$inferSelect;
 export type NewCheckInRow = typeof checkIns.$inferInsert;
+export type IncidentActivityRow = typeof incidentActivities.$inferSelect;
+export type NewIncidentActivityRow = typeof incidentActivities.$inferInsert;

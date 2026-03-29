@@ -38,13 +38,53 @@ export const openApiSpec = {
       delete: { summary: 'Delete operator', tags: ['Operators'], parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '204': { description: 'Deleted' } } },
     },
     '/incidents': {
-      get: { summary: 'List incidents', tags: ['Incidents'], responses: { '200': { description: 'List of incidents' } } },
-      post: { summary: 'Create incident', tags: ['Incidents'], responses: { '201': { description: 'Created incident' } } },
+      get: {
+        summary: 'List incidents',
+        tags: ['Incidents'],
+        parameters: [
+          { name: 'status', in: 'query', required: false, schema: { type: 'string', enum: ['reported', 'active', 'resolved', 'cancelled'] } },
+          { name: 'netId', in: 'query', required: false, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'List of incidents' } },
+      },
+      post: {
+        summary: 'Create incident',
+        tags: ['Incidents'],
+        security: [{ bearerAuth: [] }],
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/CreateIncident' } } } },
+        responses: { '201': { description: 'Created incident' }, '401': { description: 'Unauthorized' }, '422': { description: 'Invalid net_id' } },
+      },
     },
     '/incidents/{id}': {
-      get: { summary: 'Get incident', tags: ['Incidents'], parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { description: 'Incident' } } },
-      patch: { summary: 'Update incident', tags: ['Incidents'], parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { description: 'Updated incident' } } },
-      delete: { summary: 'Delete incident', tags: ['Incidents'], parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '204': { description: 'Deleted' } } },
+      get: {
+        summary: 'Get incident with activities',
+        tags: ['Incidents'],
+        parameters: [{ $ref: '#/components/parameters/Id' }],
+        responses: { '200': { description: 'Incident with activity entries' }, '404': { description: 'Not found' } },
+      },
+      patch: {
+        summary: 'Update incident status/metadata (creator only)',
+        tags: ['Incidents'],
+        security: [{ bearerAuth: [] }],
+        parameters: [{ $ref: '#/components/parameters/Id' }],
+        responses: { '200': { description: 'Updated incident' }, '401': { description: 'Unauthorized' }, '403': { description: 'Forbidden' }, '404': { description: 'Not found' }, '409': { description: 'Invalid status transition' } },
+      },
+    },
+    '/incidents/{id}/activities': {
+      post: {
+        summary: 'Log an activity entry',
+        tags: ['Incidents'],
+        security: [{ bearerAuth: [] }],
+        parameters: [{ $ref: '#/components/parameters/Id' }],
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/CreateActivity' } } } },
+        responses: { '201': { description: 'Created activity entry' }, '401': { description: 'Unauthorized' }, '404': { description: 'Incident not found' } },
+      },
+      get: {
+        summary: 'List activity entries (chronological)',
+        tags: ['Incidents'],
+        parameters: [{ $ref: '#/components/parameters/Id' }],
+        responses: { '200': { description: 'List of activity entries' }, '404': { description: 'Incident not found' } },
+      },
     },
     '/nets': {
       get: {
@@ -125,6 +165,26 @@ export const openApiSpec = {
           name: { type: 'string', example: 'Hiram Percy Maxim' },
           email: { type: 'string', format: 'email' },
           licenseClass: { type: 'string', enum: ['technician', 'general', 'extra'] },
+        },
+      },
+      CreateIncident: {
+        type: 'object',
+        required: ['title', 'incident_type', 'activation_level'],
+        properties: {
+          title: { type: 'string', example: 'Structure fire — 4th and Main' },
+          incident_type: { type: 'string', example: 'fire' },
+          activation_level: { type: 'integer', enum: [1, 2, 3], description: '1=local, 2=regional, 3=state/federal' },
+          served_agency: { type: 'string', example: 'Clark County Fire' },
+          description: { type: 'string' },
+          location: { type: 'string' },
+          net_id: { type: 'string', description: 'Optional FK to nets(id)' },
+        },
+      },
+      CreateActivity: {
+        type: 'object',
+        required: ['note'],
+        properties: {
+          note: { type: 'string', example: 'ICS 205 distributed. 6 operators on tactical channel.' },
         },
       },
       CreateNet: {
