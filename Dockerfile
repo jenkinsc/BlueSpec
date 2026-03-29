@@ -1,5 +1,5 @@
 # Stage 1: Install all dependencies
-FROM node:20-alpine AS deps
+FROM node:20-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY packages/api/package.json packages/api/
@@ -8,7 +8,7 @@ COPY packages/shared/package.json packages/shared/
 RUN npm ci
 
 # Stage 2: Build all packages
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -17,7 +17,7 @@ RUN npm run build
 RUN mkdir -p public && cp -r packages/web/dist/. public/
 
 # Stage 3: Production image
-FROM node:20-alpine AS runner
+FROM node:20-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
@@ -37,6 +37,6 @@ COPY --from=builder /app/public ./public
 
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget -qO- http://localhost:3000/health || exit 1
+  CMD node -e "fetch('http://localhost:3000/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"
 
 CMD ["node", "packages/api/dist/index.js"]
