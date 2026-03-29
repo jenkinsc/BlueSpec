@@ -10,7 +10,7 @@ import { TemplateListPage } from './pages/templates/TemplateListPage.tsx';
 import { TemplateFormPage } from './pages/templates/TemplateFormPage.tsx';
 import { IncidentListPage } from './pages/incidents/IncidentListPage.tsx';
 import { IncidentDetailPage } from './pages/incidents/IncidentDetailPage.tsx';
-import { PlaceholderPage } from './pages/PlaceholderPage.tsx';
+import { OrgPage } from './pages/org/OrgPage.tsx';
 
 export function App() {
   return (
@@ -31,10 +31,7 @@ export function App() {
               <Route path="templates/:id/edit" element={<TemplateFormPage />} />
               <Route path="incidents" element={<IncidentListPage />} />
               <Route path="incidents/:id" element={<IncidentDetailPage />} />
-              <Route
-                path="org"
-                element={<PlaceholderPage title="Organization" />}
-              />
+              <Route path="org" element={<OrgPage />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
