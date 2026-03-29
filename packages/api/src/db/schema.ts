@@ -78,6 +78,19 @@ export const incidentActivities = sqliteTable('incident_activities', {
   createdAt: text('created_at').notNull(),
 });
 
+// Net templates — reusable net configuration presets
+export const netTemplates = sqliteTable('net_templates', {
+  id: text('id').primaryKey(),
+  operatorId: text('operator_id').notNull().references(() => operators.id),
+  name: text('name').notNull(),
+  frequency: text('frequency').notNull(), // decimal string e.g. "146.520"
+  mode: text('mode').notNull().default('FM'),
+  region: text('region'),
+  notes: text('notes'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+
 export type OperatorRow = typeof operators.$inferSelect;
 export type NewOperatorRow = typeof operators.$inferInsert;
 export type IncidentRow = typeof incidents.$inferSelect;
@@ -88,3 +101,5 @@ export type CheckInRow = typeof checkIns.$inferSelect;
 export type NewCheckInRow = typeof checkIns.$inferInsert;
 export type IncidentActivityRow = typeof incidentActivities.$inferSelect;
 export type NewIncidentActivityRow = typeof incidentActivities.$inferInsert;
+export type NetTemplateRow = typeof netTemplates.$inferSelect;
+export type NewNetTemplateRow = typeof netTemplates.$inferInsert;

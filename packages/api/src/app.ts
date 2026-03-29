@@ -3,6 +3,7 @@ import { operatorsRouter } from './routes/operators.js';
 import { incidentsRouter } from './routes/incidents.js';
 import { netsRouter } from './routes/nets.js';
 import { checkInsRouter } from './routes/checkins.js';
+import { templatesRouter } from './routes/templates.js';
 import { authRouter } from './routes/auth.js';
 import { uiRouter, dashboardRoute } from './routes/ui.js';
 import { requestLogger } from './middleware/logger.js';
@@ -29,6 +30,7 @@ export function createApp() {
   app.route('/incidents', incidentsRouter);
   app.route('/nets', netsRouter);
   app.route('/check-ins', checkInsRouter);
+  app.route('/templates', templatesRouter);
 
   app.onError(errorHandler);
 
