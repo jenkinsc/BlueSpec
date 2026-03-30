@@ -16,15 +16,22 @@ function IncidentSidebar({ netId }: { netId: string }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [collapsed, setCollapsed] = useState(false);
+  const [otherCollapsed, setOtherCollapsed] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [formTitle, setFormTitle] = useState('');
   const [formType, setFormType] = useState('');
   const [formLevel, setFormLevel] = useState<1 | 2 | 3>(1);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const { data: incidents } = useQuery<Incident[]>({
+  const { data: netIncidents } = useQuery<Incident[]>({
     queryKey: ['incidents-net', netId],
     queryFn: () => apiFetch<Incident[]>(`/api/incidents?netId=${netId}&status=active`),
+    refetchInterval: 30_000,
+  });
+
+  const { data: allIncidents } = useQuery<Incident[]>({
+    queryKey: ['incidents-org-active'],
+    queryFn: () => apiFetch<Incident[]>('/api/incidents?status=active'),
     refetchInterval: 30_000,
   });
 
@@ -46,13 +53,18 @@ function IncidentSidebar({ netId }: { netId: string }) {
       setFormLevel(1);
       setFormError(null);
       void queryClient.invalidateQueries({ queryKey: ['incidents-net', netId] });
+      void queryClient.invalidateQueries({ queryKey: ['incidents-org-active'] });
     },
     onError: (err) => {
       setFormError(err instanceof Error ? err.message : 'Failed to create incident');
     },
   });
 
-  const count = incidents?.length ?? 0;
+  const thisNetIncidents = netIncidents ?? [];
+  const netIncidentIds = new Set(thisNetIncidents.map((i) => i.id));
+  const otherIncidents = (allIncidents ?? []).filter((i) => !netIncidentIds.has(i.id));
+
+  const count = thisNetIncidents.length;
 
   return (
     <div className="border-b border-orange-200 bg-orange-50">
@@ -61,7 +73,7 @@ function IncidentSidebar({ netId }: { netId: string }) {
           onClick={() => setCollapsed((v) => !v)}
           className="flex items-center gap-1 text-xs font-medium text-orange-700"
         >
-          <span>Active Incidents{count > 0 ? ` (${count})` : ''}</span>
+          <span>This Net{count > 0 ? ` (${count})` : ''}</span>
           <span>{collapsed ? '▾' : '▴'}</span>
         </button>
         <button
@@ -120,7 +132,7 @@ function IncidentSidebar({ netId }: { netId: string }) {
             <p className="text-xs text-orange-500">No active incidents linked to this net.</p>
           ) : (
             <ul className="space-y-1">
-              {incidents!.map((i) => (
+              {thisNetIncidents.map((i) => (
                 <li key={i.id}>
                   <button
                     onClick={() => navigate(`/incidents/${i.id}`)}
@@ -131,6 +143,35 @@ function IncidentSidebar({ netId }: { netId: string }) {
                 </li>
               ))}
             </ul>
+          )}
+        </div>
+      )}
+      {otherIncidents.length > 0 && (
+        <div className="border-t border-orange-200">
+          <div className="flex items-center px-4 py-2">
+            <button
+              onClick={() => setOtherCollapsed((v) => !v)}
+              className="flex items-center gap-1 text-xs font-medium text-orange-600"
+            >
+              <span>Other Active ({otherIncidents.length})</span>
+              <span>{otherCollapsed ? '▾' : '▴'}</span>
+            </button>
+          </div>
+          {!otherCollapsed && (
+            <div className="px-4 pb-2">
+              <ul className="space-y-1">
+                {otherIncidents.map((i) => (
+                  <li key={i.id}>
+                    <button
+                      onClick={() => navigate(`/incidents/${i.id}`)}
+                      className="text-xs text-orange-700 hover:underline text-left"
+                    >
+                      {i.title}{i.incidentType ? ` — ${i.incidentType}` : ''}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </div>
       )}
