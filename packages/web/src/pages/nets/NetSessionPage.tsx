@@ -325,7 +325,7 @@ function IncidentSidebar({ netId }: { netId: string }) {
 
   const { data: netIncidents } = useQuery<Incident[]>({
     queryKey: ['incidents-net', netId],
-    queryFn: () => apiFetch<Incident[]>(`/api/incidents?netId=${netId}&status=active`),
+    queryFn: () => apiFetch<Incident[]>(`/api/incidents?netId=${netId}`),
     refetchInterval: 30_000,
   });
 
