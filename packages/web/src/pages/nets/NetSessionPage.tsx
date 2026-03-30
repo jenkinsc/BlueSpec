@@ -14,7 +14,13 @@ interface Incident {
 
 function IncidentSidebar({ netId }: { netId: string }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [collapsed, setCollapsed] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [formTitle, setFormTitle] = useState('');
+  const [formType, setFormType] = useState('');
+  const [formLevel, setFormLevel] = useState<1 | 2 | 3>(1);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const { data: incidents } = useQuery<Incident[]>({
     queryKey: ['incidents-net', netId],
@@ -22,21 +28,94 @@ function IncidentSidebar({ netId }: { netId: string }) {
     refetchInterval: 30_000,
   });
 
+  const createMutation = useMutation({
+    mutationFn: () =>
+      apiFetch<Incident>('/api/incidents', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: formTitle,
+          incident_type: formType,
+          activation_level: formLevel,
+          net_id: netId,
+        }),
+      }),
+    onSuccess: () => {
+      setShowForm(false);
+      setFormTitle('');
+      setFormType('');
+      setFormLevel(1);
+      setFormError(null);
+      void queryClient.invalidateQueries({ queryKey: ['incidents-net', netId] });
+    },
+    onError: (err) => {
+      setFormError(err instanceof Error ? err.message : 'Failed to create incident');
+    },
+  });
+
   const count = incidents?.length ?? 0;
 
   return (
     <div className="border-b border-orange-200 bg-orange-50">
-      <button
-        onClick={() => setCollapsed((v) => !v)}
-        className="w-full flex items-center justify-between px-4 py-2 text-xs font-medium text-orange-700"
-      >
-        <span>
-          Active Incidents{count > 0 ? ` (${count})` : ''}
-        </span>
-        <span>{collapsed ? '▾' : '▴'}</span>
-      </button>
+      <div className="flex items-center justify-between px-4 py-2">
+        <button
+          onClick={() => setCollapsed((v) => !v)}
+          className="flex items-center gap-1 text-xs font-medium text-orange-700"
+        >
+          <span>Active Incidents{count > 0 ? ` (${count})` : ''}</span>
+          <span>{collapsed ? '▾' : '▴'}</span>
+        </button>
+        <button
+          onClick={() => { setCollapsed(false); setShowForm((v) => !v); }}
+          className="text-xs font-medium text-orange-700 border border-orange-300 rounded px-2 py-0.5 hover:bg-orange-100"
+        >
+          + New Incident
+        </button>
+      </div>
       {!collapsed && (
         <div className="px-4 pb-2">
+          {showForm && (
+            <div className="mb-2 p-2 bg-white border border-orange-200 rounded">
+              {formError && <p className="text-xs text-red-600 mb-1">{formError}</p>}
+              <div className="flex flex-col gap-1.5">
+                <input
+                  value={formTitle}
+                  onChange={(e) => setFormTitle(e.target.value)}
+                  placeholder="Title"
+                  className="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-orange-400"
+                />
+                <input
+                  value={formType}
+                  onChange={(e) => setFormType(e.target.value)}
+                  placeholder="Incident type"
+                  className="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-orange-400"
+                />
+                <select
+                  value={formLevel}
+                  onChange={(e) => setFormLevel(Number(e.target.value) as 1 | 2 | 3)}
+                  className="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-orange-400"
+                >
+                  <option value={1}>Level 1</option>
+                  <option value={2}>Level 2</option>
+                  <option value={3}>Level 3</option>
+                </select>
+                <div className="flex gap-1 justify-end">
+                  <button
+                    onClick={() => { setShowForm(false); setFormError(null); }}
+                    className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => createMutation.mutate()}
+                    disabled={createMutation.isPending || !formTitle || !formType}
+                    className="text-xs bg-orange-600 text-white rounded px-2 py-1 hover:bg-orange-700 disabled:opacity-50"
+                  >
+                    {createMutation.isPending ? 'Creating…' : 'Create'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           {count === 0 ? (
             <p className="text-xs text-orange-500">No active incidents linked to this net.</p>
           ) : (
