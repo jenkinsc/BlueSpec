@@ -15,22 +15,25 @@ interface NetRow {
   netControl: string;
   status: NetStatus;
   openedAt: string | null;
+  closedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  checkInCount?: number;
 }
 
-type Tab = 'open' | 'draft' | 'closed';
+type Tab = 'all' | 'open' | 'closed';
 
 const TABS: { key: Tab; label: string }[] = [
+  { key: 'all', label: 'All' },
   { key: 'open', label: 'Open' },
-  { key: 'draft', label: 'Draft' },
   { key: 'closed', label: 'Closed' },
 ];
 
 function useNets(status: Tab) {
   return useQuery<NetRow[]>({
     queryKey: ['nets', status],
-    queryFn: () => apiFetch<NetRow[]>(`/api/nets?status=${status}`),
+    queryFn: () =>
+      apiFetch<NetRow[]>(`/api/nets?status=${status}&includeCounts=true`),
     refetchOnWindowFocus: true,
     staleTime: 15_000,
   });
@@ -44,6 +47,15 @@ function elapsedLabel(openedAt: string | null): string {
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
   return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+}
+
+function formatClosedDate(closedAt: string | null): string {
+  if (!closedAt) return '';
+  return new Date(closedAt).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
 }
 
 function StatusDot({ status }: { status: NetStatus }) {
@@ -113,6 +125,22 @@ function NetRowItem({ net, onOpen }: NetRowItemProps) {
     );
   }
 
+  const checkInLabel =
+    net.checkInCount !== undefined
+      ? `${net.checkInCount} check-in${net.checkInCount !== 1 ? 's' : ''}`
+      : null;
+
+  let statusDetail: string;
+  if (net.status === 'open' && net.openedAt) {
+    statusDetail = `Open ${elapsedLabel(net.openedAt)}`;
+  } else if (net.status === 'closed' && net.closedAt) {
+    statusDetail = `Closed ${formatClosedDate(net.closedAt)}`;
+  } else if (net.status === 'draft') {
+    statusDetail = 'Draft';
+  } else {
+    statusDetail = net.status;
+  }
+
   return (
     <li
       className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 cursor-pointer"
@@ -128,10 +156,11 @@ function NetRowItem({ net, onOpen }: NetRowItemProps) {
         <div className="min-w-0">
           <p className="text-sm font-medium text-gray-900 truncate">{net.name}</p>
           <p className="text-xs text-gray-500 font-mono">
-            {net.frequency.toFixed(3)} · {net.mode} · {net.netControl}
-            {net.status === 'open' && net.openedAt
-              ? ` · ${elapsedLabel(net.openedAt)}`
-              : ''}
+            {net.frequency.toFixed(3)} MHz · {net.mode} · {net.netControl}
+          </p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {statusDetail}
+            {checkInLabel ? ` · ${checkInLabel}` : ''}
           </p>
         </div>
       </div>
@@ -162,7 +191,7 @@ function TabPanel({ tab, onOpen }: { tab: Tab; onOpen: (id: string) => void }) {
   if (!data || data.length === 0) {
     return (
       <div className="px-4 py-12 text-center text-sm text-gray-400">
-        No {tab} nets.
+        No {tab === 'all' ? '' : tab + ' '}nets.
       </div>
     );
   }
@@ -183,8 +212,8 @@ export function NetListPage() {
 
   const handleCreated = (net: NetRow) => {
     setShowCreate(false);
-    // New nets start as draft — switch to draft tab
-    setActiveTab('draft');
+    // New nets start as draft — switch to all tab so it's visible
+    setActiveTab('all');
     // Navigate to the net's session page if opened immediately
     if (net.status === 'open') navigate(`/nets/${net.id}`);
   };
@@ -196,9 +225,9 @@ export function NetListPage() {
         <h1 className="text-xl font-semibold text-gray-900">Nets</h1>
         <button
           onClick={() => setShowCreate(true)}
-          className="flex items-center gap-1 bg-indigo-600 text-white text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-indigo-700"
+          className="flex items-center gap-1.5 bg-indigo-600 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-indigo-700 shadow-sm"
         >
-          <span className="text-base leading-none">+</span> New
+          <span className="text-base leading-none">+</span> Create Net
         </button>
       </div>
 

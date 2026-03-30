@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql, getTableColumns } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/index.js';
 import { nets, checkIns } from '../db/schema.js';
@@ -60,6 +60,7 @@ const UpdateCheckInSchema = z.object({
 
 export const netsRouter = new Hono()
   // GET /nets — list nets, optional ?status= filter (default: open)
+  // Optional ?includeCounts=true adds checkInCount to each net row.
   // If X-Org-Id header is present, validates membership and filters by org.
   // Without X-Org-Id, returns all nets (public access preserved).
   .get('/', async (c) => {
@@ -69,6 +70,7 @@ export const netsRouter = new Hono()
       return c.json({ error: 'Invalid status. Use: draft, open, closed, all' }, 400);
     }
     const filter = parsed.data;
+    const includeCounts = c.req.query('includeCounts') === 'true';
 
     const orgResult = await tryGetOrgId(c);
     if (orgResult instanceof Response) return orgResult;
@@ -77,6 +79,23 @@ export const netsRouter = new Hono()
     const conditions = [];
     if (orgId) conditions.push(eq(nets.organizationId, orgId));
     if (filter !== 'all') conditions.push(eq(nets.status, filter));
+
+    if (includeCounts) {
+      const selectFields = {
+        ...getTableColumns(nets),
+        checkInCount: sql<number>`count(${checkIns.id})`,
+      };
+      const baseQuery = db
+        .select(selectFields)
+        .from(nets)
+        .leftJoin(checkIns, eq(checkIns.netId, nets.id))
+        .groupBy(nets.id);
+      const rows =
+        conditions.length > 0
+          ? await baseQuery.where(and(...conditions))
+          : await baseQuery;
+      return c.json(rows);
+    }
 
     const rows =
       conditions.length > 0

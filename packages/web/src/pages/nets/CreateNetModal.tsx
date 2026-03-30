@@ -33,6 +33,7 @@ interface NetRow {
   netControl: string;
   status: 'draft' | 'open' | 'closed';
   openedAt: string | null;
+  closedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
