@@ -32,6 +32,9 @@ RUN npm ci --omit=dev
 COPY --from=builder /app/packages/api/dist ./packages/api/dist
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 
+# Copy Drizzle migration files needed at runtime
+COPY --from=builder /app/packages/api/drizzle ./packages/api/drizzle
+
 # Copy web assets (served by the API at runtime)
 COPY --from=builder /app/public ./public
 
@@ -39,4 +42,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "fetch('http://localhost:3000/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"
 
-CMD ["node", "packages/api/dist/index.js"]
+CMD ["sh", "-c", "node packages/api/dist/db/migrate.js && node packages/api/dist/index.js"]
