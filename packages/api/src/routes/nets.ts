@@ -234,7 +234,7 @@ export const netsRouter = new Hono()
     const [row] = await db.select().from(nets).where(eq(nets.id, id)).limit(1);
     if (!row) return c.json({ error: 'Not found' }, 404);
 
-    if (orgId && row.organizationId !== orgId) {
+    if (orgId && row.organizationId !== null && row.organizationId !== orgId) {
       return c.json({ error: 'Not found' }, 404);
     }
 

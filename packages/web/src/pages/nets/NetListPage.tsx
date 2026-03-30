@@ -76,28 +76,40 @@ interface NetRowItemProps {
 function NetRowItem({ net, onOpen }: NetRowItemProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [openError, setOpenError] = useState<string | null>(null);
 
   const openMutation = useMutation({
     mutationFn: () =>
       apiFetch<NetRow>(`/api/nets/${net.id}/open`, { method: 'POST' }),
     onSuccess: () => {
+      setOpenError(null);
       void queryClient.invalidateQueries({ queryKey: ['nets'] });
+    },
+    onError: (err: unknown) => {
+      const message =
+        err instanceof Error ? err.message : 'Failed to open net. Please try again.';
+      setOpenError(message);
     },
   });
 
   let action: React.ReactNode;
   if (net.status === 'draft') {
     action = (
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          openMutation.mutate();
-        }}
-        disabled={openMutation.isPending}
-        className="text-xs font-medium text-indigo-600 hover:text-indigo-800 border border-indigo-300 rounded px-2 py-1 disabled:opacity-50"
-      >
-        {openMutation.isPending ? 'Opening…' : 'Open Net'}
-      </button>
+      <div className="flex flex-col items-end gap-1">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            openMutation.mutate();
+          }}
+          disabled={openMutation.isPending}
+          className="text-xs font-medium text-indigo-600 hover:text-indigo-800 border border-indigo-300 rounded px-2 py-1 disabled:opacity-50"
+        >
+          {openMutation.isPending ? 'Opening…' : 'Open Net'}
+        </button>
+        {openError && (
+          <p className="text-xs text-red-600 max-w-[160px] text-right">{openError}</p>
+        )}
+      </div>
     );
   } else if (net.status === 'open') {
     action = (
