@@ -37,42 +37,42 @@ function formatAlertTime(iso: string): string {
 }
 
 function WeatherAlertsPanel({ netId }: { netId: string }) {
-  const storageKey = `nws_wfo_net_${netId}`;
+  const storageKey = `nws_state_net_${netId}`;
   const [collapsed, setCollapsed] = useState(false);
-  const [wfo, setWfo] = useState<string>(() => localStorage.getItem(storageKey) ?? '');
-  const [editingWfo, setEditingWfo] = useState(false);
-  const [wfoInput, setWfoInput] = useState('');
+  const [state, setState] = useState<string>(() => localStorage.getItem(storageKey) ?? '');
+  const [editingState, setEditingState] = useState(false);
+  const [stateInput, setStateInput] = useState('');
 
   const { data, isLoading, isError } = useQuery<NWSAlertsResponse>({
-    queryKey: ['nws-alerts', wfo],
+    queryKey: ['nws-alerts', state],
     queryFn: async () => {
-      const res = await fetch(`https://api.weather.gov/alerts/active?office=${wfo}`, {
+      const res = await fetch(`https://api.weather.gov/alerts/active?area=${state}`, {
         headers: { Accept: 'application/geo+json' },
       });
       if (!res.ok) throw new Error(`NWS API error: ${res.status}`);
       return res.json() as Promise<NWSAlertsResponse>;
     },
-    enabled: !!wfo,
+    enabled: !!state,
     refetchInterval: 5 * 60 * 1000,
     staleTime: 4 * 60 * 1000,
   });
 
   const alerts = data?.features ?? [];
 
-  const saveWfo = () => {
-    const val = wfoInput.trim().toUpperCase();
-    setWfo(val);
+  const saveState = () => {
+    const val = stateInput.trim().toUpperCase();
+    setState(val);
     if (val) {
       localStorage.setItem(storageKey, val);
     } else {
       localStorage.removeItem(storageKey);
     }
-    setEditingWfo(false);
+    setEditingState(false);
   };
 
   const openEdit = () => {
-    setWfoInput(wfo);
-    setEditingWfo(true);
+    setStateInput(state);
+    setEditingState(true);
     setCollapsed(false);
   };
 
@@ -89,49 +89,40 @@ function WeatherAlertsPanel({ netId }: { netId: string }) {
         <button
           onClick={openEdit}
           className="text-xs text-sky-600 hover:text-sky-800 px-1"
-          title="Configure NWS office"
-          aria-label="Configure NWS office"
+          title="Configure state"
+          aria-label="Configure state"
         >
           ⚙
         </button>
       </div>
       {!collapsed && (
         <div className="px-4 pb-2">
-          {editingWfo && (
+          {editingState && (
             <div className="mb-2 p-2 bg-white border border-sky-200 rounded">
               <p className="text-xs text-gray-500 mb-1">
-                Enter a{' '}
-                <a
-                  href="https://www.weather.gov/srh/nwsoffices"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-indigo-600 hover:underline"
-                >
-                  NWS WFO code
-                </a>{' '}
-                (e.g. LWX, OKX, LOT)
+                Enter a two-letter state abbreviation (e.g. VA, NY, IL)
               </p>
               <div className="flex gap-1">
                 <input
-                  value={wfoInput}
-                  onChange={(e) => setWfoInput(e.target.value.toUpperCase())}
+                  value={stateInput}
+                  onChange={(e) => setStateInput(e.target.value.toUpperCase())}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') saveWfo();
-                    if (e.key === 'Escape') setEditingWfo(false);
+                    if (e.key === 'Enter') saveState();
+                    if (e.key === 'Escape') setEditingState(false);
                   }}
-                  placeholder="e.g. LWX"
-                  maxLength={4}
+                  placeholder="e.g. VA"
+                  maxLength={2}
                   className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-sky-400"
                   autoFocus
                 />
                 <button
-                  onClick={saveWfo}
+                  onClick={saveState}
                   className="text-xs bg-sky-600 text-white rounded px-2 py-1 hover:bg-sky-700"
                 >
                   Save
                 </button>
                 <button
-                  onClick={() => setEditingWfo(false)}
+                  onClick={() => setEditingState(false)}
                   className="text-xs text-gray-500 hover:text-gray-700 px-1"
                 >
                   Cancel
@@ -139,9 +130,9 @@ function WeatherAlertsPanel({ netId }: { netId: string }) {
               </div>
             </div>
           )}
-          {!wfo ? (
+          {!state ? (
             <p className="text-xs text-sky-500">
-              Set NWS office to see alerts.{' '}
+              Set state to see alerts.{' '}
               <button onClick={openEdit} className="text-indigo-600 hover:underline">
                 Configure
               </button>
@@ -151,7 +142,7 @@ function WeatherAlertsPanel({ netId }: { netId: string }) {
           ) : isError ? (
             <p className="text-xs text-red-500">Failed to fetch weather alerts.</p>
           ) : alerts.length === 0 ? (
-            <p className="text-xs text-sky-400">No active alerts for {wfo}.</p>
+            <p className="text-xs text-sky-400">No active alerts for {state}.</p>
           ) : (
             <ul className="space-y-1.5">
               {alerts.map((alert) => (
