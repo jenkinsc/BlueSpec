@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -6,17 +5,17 @@ import { useAuth } from '../lib/auth.tsx';
 import { useNavigate, Link } from 'react-router-dom';
 
 const schema = z.object({
-  callsign: z.string().min(3, 'Enter your callsign'),
-  password: z.string().min(1, 'Enter your password'),
+  callsign: z.string().min(3, 'Callsign must be at least 3 characters').max(10, 'Callsign too long'),
+  name: z.string().min(1, 'Enter your name'),
+  email: z.string().email('Enter a valid email').or(z.literal('')).optional(),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
 });
 
 type FormValues = z.infer<typeof schema>;
 
-export function LoginPage() {
-  const { login, loginDemo } = useAuth();
+export function RegisterPage() {
+  const { register: registerUser } = useAuth();
   const navigate = useNavigate();
-  const [demoLoading, setDemoLoading] = useState(false);
-  const [demoError, setDemoError] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
@@ -26,11 +25,12 @@ export function LoginPage() {
 
   const onSubmit = async (values: FormValues) => {
     try {
-      await login(values.callsign, values.password);
+      const email = values.email || undefined;
+      await registerUser(values.callsign, values.name, values.password, email);
       navigate('/', { replace: true });
     } catch (err) {
       setError('root', {
-        message: err instanceof Error ? err.message : 'Login failed',
+        message: err instanceof Error ? err.message : 'Registration failed',
       });
     }
   };
@@ -39,7 +39,7 @@ export function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-sm">
         <h1 className="text-2xl font-bold text-center text-gray-900 mb-8">
-          EmComm Net Control
+          Create Account
         </h1>
         <form
           onSubmit={handleSubmit(onSubmit)}
@@ -57,9 +57,36 @@ export function LoginPage() {
               placeholder="W1AW"
             />
             {errors.callsign && (
-              <p className="mt-1 text-xs text-red-600">
-                {errors.callsign.message}
-              </p>
+              <p className="mt-1 text-xs text-red-600">{errors.callsign.message}</p>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Name
+            </label>
+            <input
+              {...register('name')}
+              autoComplete="name"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder="Jane Smith"
+            />
+            {errors.name && (
+              <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Email <span className="text-gray-400">(optional)</span>
+            </label>
+            <input
+              {...register('email')}
+              type="email"
+              autoComplete="email"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder="jane@example.com"
+            />
+            {errors.email && (
+              <p className="mt-1 text-xs text-red-600">{errors.email.message}</p>
             )}
           </div>
           <div>
@@ -69,13 +96,11 @@ export function LoginPage() {
             <input
               {...register('password')}
               type="password"
-              autoComplete="current-password"
+              autoComplete="new-password"
               className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
             {errors.password && (
-              <p className="mt-1 text-xs text-red-600">
-                {errors.password.message}
-              </p>
+              <p className="mt-1 text-xs text-red-600">{errors.password.message}</p>
             )}
           </div>
           {errors.root && (
@@ -86,37 +111,17 @@ export function LoginPage() {
             disabled={isSubmitting}
             className="w-full bg-indigo-600 text-white py-2 px-4 rounded-md text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
           >
-            {isSubmitting ? 'Signing in…' : 'Sign in'}
+            {isSubmitting ? 'Creating account…' : 'Create account'}
           </button>
         </form>
 
         <div className="mt-4 text-center">
-          <p className="text-sm text-gray-600 mb-3">
-            No account?{' '}
-            <Link to="/register" className="font-medium text-indigo-600 hover:underline">
-              Sign up
+          <p className="text-sm text-gray-600">
+            Already have an account?{' '}
+            <Link to="/login" className="font-medium text-indigo-600 hover:underline">
+              Sign in
             </Link>
           </p>
-          <p className="text-xs text-gray-400 mb-2">Want to explore without signing up?</p>
-          {demoError && <p className="text-xs text-red-600 mb-2">{demoError}</p>}
-          <button
-            onClick={async () => {
-              setDemoLoading(true);
-              setDemoError(null);
-              try {
-                await loginDemo();
-                navigate('/', { replace: true });
-              } catch (err) {
-                setDemoError(err instanceof Error ? err.message : 'Demo failed');
-              } finally {
-                setDemoLoading(false);
-              }
-            }}
-            disabled={demoLoading}
-            className="text-sm font-medium text-indigo-600 hover:underline disabled:opacity-50"
-          >
-            {demoLoading ? 'Starting demo…' : 'Try Demo →'}
-          </button>
         </div>
       </div>
     </div>

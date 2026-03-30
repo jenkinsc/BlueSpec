@@ -5,7 +5,6 @@ import { OnboardingModal, useOnboarding } from './OnboardingModal.tsx';
 
 const navItems = [
   { to: '/', label: 'Nets', icon: '📡' },
-  { to: '/sessions', label: 'Sessions', icon: '🎙️' },
   { to: '/templates', label: 'Templates', icon: '📋' },
   { to: '/incidents', label: 'Incidents', icon: '⚠️' },
   { to: '/org', label: 'Org', icon: '🏢' },

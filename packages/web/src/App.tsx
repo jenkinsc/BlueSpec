@@ -13,6 +13,7 @@ import { IncidentListPage } from './pages/incidents/IncidentListPage.tsx';
 import { IncidentDetailPage } from './pages/incidents/IncidentDetailPage.tsx';
 import { OrgPage } from './pages/org/OrgPage.tsx';
 import { InviteAcceptPage } from './pages/InviteAcceptPage.tsx';
+import { RegisterPage } from './pages/RegisterPage.tsx';
 
 export function App() {
   return (
@@ -21,6 +22,7 @@ export function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
             <Route path="/invite/:token" element={<InviteAcceptPage />} />
             <Route element={<ProtectedRoute />}>
               <Route element={<AppShell />}>
