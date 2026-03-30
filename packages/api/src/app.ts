@@ -38,8 +38,9 @@ export function createApp() {
     }),
   );
 
-  // Global rate limit: 100 req/min per IP
-  app.use('*', rateLimit({ name: 'global', max: 100, windowMs: 60_000 }));
+  // Global rate limit: 100 req/min per IP (override via RATE_LIMIT_GLOBAL env var for testing)
+  const globalRateMax = process.env.RATE_LIMIT_GLOBAL ? parseInt(process.env.RATE_LIMIT_GLOBAL, 10) : 100;
+  app.use('*', rateLimit({ name: 'global', max: globalRateMax, windowMs: 60_000 }));
 
   app.use('*', requestLogger);
 

@@ -69,6 +69,11 @@ async function backfillMigrationRecords(): Promise<void> {
       tag: '0007_invites',
       probe: `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='org_invites'`,
     },
+    {
+      when: 1774811411000,
+      tag: '0009_net_events',
+      probe: `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='net_events'`,
+    },
   ];
 
   for (const m of pending) {
