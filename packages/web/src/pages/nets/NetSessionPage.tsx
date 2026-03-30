@@ -226,14 +226,17 @@ function CheckInEntryForm({
   netId,
   netOpen,
   callsign,
+  isNetControl,
   onCheckedIn,
 }: {
   netId: string;
   netOpen: boolean;
   callsign: string;
+  isNetControl: boolean;
   onCheckedIn: () => void;
 }) {
   const callsignRef = useRef<HTMLInputElement>(null);
+  const [enteredCallsign, setEnteredCallsign] = useState(callsign);
   const [signal, setSignal] = useState('59');
   const [traffic, setTraffic] = useState<TrafficType>('routine');
   const [remarks, setRemarks] = useState('');
@@ -247,9 +250,11 @@ function CheckInEntryForm({
           signal_report: signal || undefined,
           traffic_type: traffic,
           remarks: remarks || undefined,
+          operator_callsign: isNetControl ? enteredCallsign || undefined : undefined,
         }),
       }),
     onSuccess: () => {
+      setEnteredCallsign(callsign);
       setSignal('59');
       setTraffic('routine');
       setRemarks('');
@@ -279,15 +284,16 @@ function CheckInEntryForm({
     <div className="bg-white border-t border-gray-200 px-4 py-3">
       {error && <p className="text-xs text-red-600 mb-2">{error}</p>}
       <div className="flex items-end gap-2">
-        {/* Callsign — pre-filled, read-only (API uses JWT callsign) */}
+        {/* Callsign — editable for net control, read-only otherwise */}
         <div className="flex-1 min-w-0">
           <label className="block text-xs text-gray-500 mb-1">Callsign</label>
           <input
             ref={callsignRef}
-            value={callsign}
-            readOnly
+            value={isNetControl ? enteredCallsign : callsign}
+            readOnly={!isNetControl}
+            onChange={isNetControl ? (e) => setEnteredCallsign(e.target.value.toUpperCase()) : undefined}
             onKeyDown={handleKeyDown}
-            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className={`w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 ${isNetControl ? '' : 'bg-gray-50'}`}
           />
         </div>
 
@@ -485,6 +491,7 @@ export function NetSessionPage() {
         netId={id!}
         netOpen={net.status === 'open'}
         callsign={callsign ?? ''}
+        isNetControl={isNetControl}
         onCheckedIn={() => void queryClient.invalidateQueries({ queryKey: ['check-ins', id] })}
       />
     </div>

@@ -42,6 +42,7 @@ const CreateCheckInSchema = z.object({
   signal_report: SignalReportSchema.optional(),
   traffic_type: z.enum(TRAFFIC_TYPE_ENUM).default('routine'),
   remarks: z.string().optional(),
+  operator_callsign: z.string().min(1).optional(),
 });
 
 const UpdateCheckInSchema = z.object({
@@ -280,11 +281,26 @@ export const netsRouter = new Hono()
       return c.json({ error: 'net_not_open' }, 409);
     }
 
-    // Enforce unique check-in per operator per net
+    const isNetControl = net.netControlId === operatorId;
+
+    // Determine effective callsign and operatorId for this check-in
+    let effectiveCallsign: string;
+    let effectiveOperatorId: string | null;
+
+    if (isNetControl && body.operator_callsign) {
+      // Net control is checking in a third-party station
+      effectiveCallsign = body.operator_callsign.toUpperCase();
+      effectiveOperatorId = null;
+    } else {
+      effectiveCallsign = callsign;
+      effectiveOperatorId = operatorId;
+    }
+
+    // Enforce unique check-in per callsign per net
     const [existing] = await db
       .select({ id: checkIns.id })
       .from(checkIns)
-      .where(and(eq(checkIns.netId, netId), eq(checkIns.operatorId, operatorId)))
+      .where(and(eq(checkIns.netId, netId), eq(checkIns.operatorCallsign, effectiveCallsign)))
       .limit(1);
     if (existing) {
       return c.json({ error: 'already_checked_in' }, 409);
@@ -296,8 +312,8 @@ export const netsRouter = new Hono()
       .values({
         id: newId(),
         netId,
-        operatorId,
-        operatorCallsign: callsign,
+        operatorId: effectiveOperatorId,
+        operatorCallsign: effectiveCallsign,
         trafficType: body.traffic_type,
         signalReport: body.signal_report,
         remarks: body.remarks,
