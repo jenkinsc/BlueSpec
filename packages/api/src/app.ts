@@ -11,7 +11,7 @@ import { templatesRouter } from './routes/templates.js';
 import { organizationsRouter } from './routes/organizations.js';
 import { invitesRouter } from './routes/invites.js';
 import { authRouter } from './routes/auth.js';
-import { uiRouter, dashboardRoute } from './routes/ui.js';
+import { uiRouter } from './routes/ui.js';
 import { requestLogger } from './middleware/logger.js';
 import { errorHandler } from './middleware/error.js';
 import { rateLimit } from './middleware/rateLimit.js';
@@ -61,7 +61,6 @@ export function createApp() {
   app.route('/auth', authRouter);
 
   // Web UI
-  app.route('/', dashboardRoute);
   app.route('/ui', uiRouter);
 
   // API routes (public reads; auth enforced per-route where needed)
