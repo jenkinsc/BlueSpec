@@ -40,7 +40,15 @@ This installs all workspace dependencies in one shot.
 npm run build --workspace=packages/shared
 ```
 
-### 3. Start the API server
+### 3. Run database migrations
+
+```bash
+npm run db:migrate --workspace=packages/api
+```
+
+This creates `packages/api/emcomm.db` (SQLite) and applies all pending migrations. Run this once on fresh checkout and again any time new migrations are added.
+
+### 4. Start the API server
 
 ```bash
 npm run dev:api
@@ -48,7 +56,7 @@ npm run dev:api
 
 The API will start on `http://localhost:3000` (override with `PORT` env var).
 
-### 4. Start the web app (separate terminal)
+### 5. Start the web app (separate terminal)
 
 ```bash
 npm run dev:web
