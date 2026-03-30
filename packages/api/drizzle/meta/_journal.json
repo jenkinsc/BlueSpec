@@ -57,6 +57,13 @@
       "when": 1774811409000,
       "tag": "0007_invites",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1774811410000,
+      "tag": "0008_check_ins_role_mode",
+      "breakpoints": true
     }
   ]
 }

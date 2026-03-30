@@ -377,12 +377,17 @@ interface NetRow {
   updatedAt: string;
 }
 
+type CheckInRole = 'NET_CONTROL' | 'RELAY' | 'MOBILE' | 'PORTABLE' | 'FIXED' | 'EOC' | 'EMCOMM';
+type CheckInMode = 'SSB' | 'FM' | 'AM' | 'DIGITAL' | 'PACKET' | 'WINLINK' | 'OTHER';
+
 interface CheckIn {
   id: string;
   netId: string;
   operatorId: string | null;
   operatorCallsign: string;
   trafficType: 'routine' | 'welfare' | 'priority' | 'emergency';
+  role: CheckInRole | null;
+  mode: CheckInMode | null;
   signalReport: string | null;
   remarks: string | null;
   checkedInAt: string;
@@ -397,6 +402,9 @@ const TRAFFIC_BADGE: Record<TrafficType, string> = {
   priority: 'bg-yellow-100 text-yellow-700',
   emergency: 'bg-red-100 text-red-700',
 };
+
+const CHECKIN_ROLES: CheckInRole[] = ['NET_CONTROL', 'RELAY', 'MOBILE', 'PORTABLE', 'FIXED', 'EOC', 'EMCOMM'];
+const CHECKIN_MODES: CheckInMode[] = ['SSB', 'FM', 'AM', 'DIGITAL', 'PACKET', 'WINLINK', 'OTHER'];
 
 function elapsedLabel(openedAt: string | null): string {
   if (!openedAt) return '';
@@ -486,6 +494,16 @@ function CheckInListItem({
         >
           {checkIn.trafficType}
         </span>
+        {checkIn.role && (
+          <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 shrink-0">
+            {checkIn.role}
+          </span>
+        )}
+        {checkIn.mode && (
+          <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-teal-100 text-teal-700 shrink-0">
+            {checkIn.mode}
+          </span>
+        )}
         {checkIn.remarks && (
           <span className="text-xs text-gray-500 truncate">{checkIn.remarks}</span>
         )}
@@ -542,6 +560,8 @@ function CheckInEntryForm({
   const [enteredCallsign, setEnteredCallsign] = useState(callsign);
   const [signal, setSignal] = useState('59');
   const [traffic, setTraffic] = useState<TrafficType>('routine');
+  const [role, setRole] = useState<CheckInRole | ''>('');
+  const [mode, setMode] = useState<CheckInMode | ''>('');
   const [remarks, setRemarks] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -552,6 +572,8 @@ function CheckInEntryForm({
         body: JSON.stringify({
           signal_report: signal || undefined,
           traffic_type: traffic,
+          role: role || undefined,
+          mode: mode || undefined,
           remarks: remarks || undefined,
           operator_callsign: isNetControl ? enteredCallsign || undefined : undefined,
         }),
@@ -560,6 +582,8 @@ function CheckInEntryForm({
       setEnteredCallsign(callsign);
       setSignal('59');
       setTraffic('routine');
+      setRole('');
+      setMode('');
       setRemarks('');
       setError(null);
       onCheckedIn();
@@ -626,6 +650,38 @@ function CheckInEntryForm({
               <option key={t} value={t}>
                 {t}
               </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Role */}
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Role</label>
+          <select
+            value={role}
+            onChange={(e) => setRole(e.target.value as CheckInRole | '')}
+            onKeyDown={handleKeyDown}
+            className="border border-gray-300 rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="">—</option>
+            {CHECKIN_ROLES.map((r) => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Mode */}
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Mode</label>
+          <select
+            value={mode}
+            onChange={(e) => setMode(e.target.value as CheckInMode | '')}
+            onKeyDown={handleKeyDown}
+            className="border border-gray-300 rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="">—</option>
+            {CHECKIN_MODES.map((m) => (
+              <option key={m} value={m}>{m}</option>
             ))}
           </select>
         </div>

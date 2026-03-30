@@ -64,6 +64,8 @@ export const checkIns = sqliteTable('check_ins', {
   status: text('status').notNull().default('active'), // 'active' | 'standby' | 'signed_off'
   trafficCount: integer('traffic_count').notNull().default(0),
   trafficType: text('traffic_type').notNull().default('routine'), // 'routine' | 'welfare' | 'priority' | 'emergency'
+  role: text('role'), // 'NET_CONTROL' | 'RELAY' | 'MOBILE' | 'PORTABLE' | 'FIXED' | 'EOC' | 'EMCOMM'
+  mode: text('mode'), // 'SSB' | 'FM' | 'AM' | 'DIGITAL' | 'PACKET' | 'WINLINK' | 'OTHER'
   signalReport: text('signal_report'), // RST scale e.g. "59", "579"
   remarks: text('remarks'),
   acknowledgedAt: text('acknowledged_at'),

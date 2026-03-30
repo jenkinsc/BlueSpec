@@ -11,6 +11,8 @@ import { tryGetOrgId } from '../middleware/org.js';
 const MODE_ENUM = ['FM', 'SSB', 'CW', 'DMR', 'D-STAR', 'FT8', 'other'] as const;
 const STATUS_ENUM = ['draft', 'open', 'closed'] as const;
 const TRAFFIC_TYPE_ENUM = ['routine', 'welfare', 'priority', 'emergency'] as const;
+const CHECKIN_ROLE_ENUM = ['NET_CONTROL', 'RELAY', 'MOBILE', 'PORTABLE', 'FIXED', 'EOC', 'EMCOMM'] as const;
+const CHECKIN_MODE_ENUM = ['SSB', 'FM', 'AM', 'DIGITAL', 'PACKET', 'WINLINK', 'OTHER'] as const;
 
 // Frequency validated as a decimal string e.g. "146.520"
 const FrequencySchema = z
@@ -41,6 +43,8 @@ const SignalReportSchema = z
 const CreateCheckInSchema = z.object({
   signal_report: SignalReportSchema.optional(),
   traffic_type: z.enum(TRAFFIC_TYPE_ENUM).default('routine'),
+  role: z.enum(CHECKIN_ROLE_ENUM).optional(),
+  mode: z.enum(CHECKIN_MODE_ENUM).optional(),
   remarks: z.string().optional(),
   operator_callsign: z.string().min(1).optional(),
 });
@@ -48,6 +52,8 @@ const CreateCheckInSchema = z.object({
 const UpdateCheckInSchema = z.object({
   signal_report: SignalReportSchema.optional(),
   traffic_type: z.enum(TRAFFIC_TYPE_ENUM).optional(),
+  role: z.enum(CHECKIN_ROLE_ENUM).optional(),
+  mode: z.enum(CHECKIN_MODE_ENUM).optional(),
   remarks: z.string().optional(),
   acknowledged_at: z.string().datetime().optional(),
 });
@@ -315,6 +321,8 @@ export const netsRouter = new Hono()
         operatorId: effectiveOperatorId,
         operatorCallsign: effectiveCallsign,
         trafficType: body.traffic_type,
+        role: body.role,
+        mode: body.mode,
         signalReport: body.signal_report,
         remarks: body.remarks,
         checkedInAt: now,
@@ -359,6 +367,8 @@ export const netsRouter = new Hono()
     const updates: Record<string, unknown> = { updatedAt: now };
     if (body.signal_report !== undefined) updates.signalReport = body.signal_report;
     if (body.traffic_type !== undefined) updates.trafficType = body.traffic_type;
+    if (body.role !== undefined) updates.role = body.role;
+    if (body.mode !== undefined) updates.mode = body.mode;
     if (body.remarks !== undefined) updates.remarks = body.remarks;
     if (body.acknowledged_at !== undefined) updates.acknowledgedAt = body.acknowledged_at;
 
