@@ -1,9 +1,10 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { and, eq, sql, getTableColumns } from 'drizzle-orm';
+import { and, asc, eq, sql, getTableColumns } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/index.js';
-import { nets, checkIns } from '../db/schema.js';
+import { nets, checkIns, netEvents } from '../db/schema.js';
+import type { NetEventType } from '../db/schema.js';
 import { newId } from '../lib/ids.js';
 import { requireAuth } from '../middleware/auth.js';
 import { tryGetOrgId } from '../middleware/org.js';
@@ -56,6 +57,34 @@ const UpdateCheckInSchema = z.object({
   mode: z.enum(CHECKIN_MODE_ENUM).optional(),
   remarks: z.string().optional(),
   acknowledged_at: z.string().datetime().optional(),
+  // Location fields (BLUAAA-76)
+  grid_square: z.string().optional(),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
+  county: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+});
+
+// Helper — append a net event row
+async function appendNetEvent(
+  netId: string,
+  eventType: NetEventType,
+  operatorId: string | null,
+  note?: string,
+): Promise<void> {
+  await db.insert(netEvents).values({
+    id: newId(),
+    netId,
+    operatorId,
+    eventType,
+    note: note ?? null,
+    createdAt: new Date().toISOString(),
+  });
+}
+
+const CreateNetEventSchema = z.object({
+  note: z.string().min(1),
 });
 
 export const netsRouter = new Hono()
@@ -222,6 +251,7 @@ export const netsRouter = new Hono()
       .set({ status: 'open', netControlId: operatorId, openedAt: now, updatedAt: now })
       .where(eq(nets.id, id))
       .returning();
+    await appendNetEvent(id, 'net_open', operatorId, `Net opened by ${c.get('callsign') as string}`);
     return c.json(updated);
   })
 
@@ -258,6 +288,7 @@ export const netsRouter = new Hono()
       .set({ status: 'closed', closedAt: now, updatedAt: now })
       .where(eq(nets.id, id))
       .returning();
+    await appendNetEvent(id, 'net_close', operatorId, `Net closed by ${c.get('callsign') as string}`);
     return c.json(updated);
   })
 
@@ -348,6 +379,12 @@ export const netsRouter = new Hono()
         updatedAt: now,
       })
       .returning();
+    await appendNetEvent(
+      netId,
+      'check_in',
+      effectiveOperatorId,
+      `${effectiveCallsign} checked in${body.role ? ` as ${body.role}` : ''}${body.mode ? ` via ${body.mode}` : ''}`,
+    );
     return c.json(created, 201);
   })
 
@@ -390,12 +427,53 @@ export const netsRouter = new Hono()
     if (body.mode !== undefined) updates.mode = body.mode;
     if (body.remarks !== undefined) updates.remarks = body.remarks;
     if (body.acknowledged_at !== undefined) updates.acknowledgedAt = body.acknowledged_at;
+    // Location fields (BLUAAA-76)
+    if (body.grid_square !== undefined) updates.gridSquare = body.grid_square;
+    if (body.latitude !== undefined) updates.latitude = body.latitude;
+    if (body.longitude !== undefined) updates.longitude = body.longitude;
+    if (body.county !== undefined) updates.county = body.county;
+    if (body.city !== undefined) updates.city = body.city;
+    if (body.state !== undefined) updates.state = body.state;
 
     const [updated] = await db
       .update(checkIns)
       .set(updates)
       .where(eq(checkIns.id, checkInId))
       .returning();
+
+    // Append granular timeline events for each changed field
+    if (body.role !== undefined && body.role !== checkIn.role) {
+      await appendNetEvent(netId, 'role_change', operatorId,
+        `${checkIn.operatorCallsign} role changed to ${body.role}`);
+    }
+    if (body.mode !== undefined && body.mode !== checkIn.mode) {
+      await appendNetEvent(netId, 'mode_change', operatorId,
+        `${checkIn.operatorCallsign} mode changed to ${body.mode}`);
+    }
+    if (body.traffic_type !== undefined && body.traffic_type !== checkIn.trafficType) {
+      await appendNetEvent(netId, 'status_change', operatorId,
+        `${checkIn.operatorCallsign} traffic type changed to ${body.traffic_type}`);
+    }
+    // Emit location_change event if any location field changed
+    const locationChanged =
+      (body.grid_square !== undefined && body.grid_square !== checkIn.gridSquare) ||
+      (body.latitude !== undefined && body.latitude !== checkIn.latitude) ||
+      (body.longitude !== undefined && body.longitude !== checkIn.longitude) ||
+      (body.county !== undefined && body.county !== checkIn.county) ||
+      (body.city !== undefined && body.city !== checkIn.city) ||
+      (body.state !== undefined && body.state !== checkIn.state);
+    if (locationChanged) {
+      const locParts: string[] = [];
+      const gs = body.grid_square ?? checkIn.gridSquare;
+      const city = body.city ?? checkIn.city;
+      const st = body.state ?? checkIn.state;
+      if (gs) locParts.push(gs);
+      if (city) locParts.push(city);
+      if (st) locParts.push(st);
+      await appendNetEvent(netId, 'location_change', operatorId,
+        `${checkIn.operatorCallsign} location updated${locParts.length ? `: ${locParts.join(', ')}` : ''}`);
+    }
+
     return c.json(updated);
   })
 
@@ -427,5 +505,58 @@ export const netsRouter = new Hono()
       .where(and(eq(checkIns.id, checkInId), eq(checkIns.netId, netId)))
       .returning();
     if (!deleted) return c.json({ error: 'Check-in not found' }, 404);
+    await appendNetEvent(netId, 'check_out', operatorId,
+      `${deleted.operatorCallsign} removed from net`);
     return c.body(null, 204);
+  })
+
+  // --- Net events routes ---
+
+  // GET /nets/:id/events — list all events for a net sorted by createdAt ASC
+  .get('/:id/events', async (c) => {
+    const netId = c.req.param('id') as string;
+
+    const orgResult = await tryGetOrgId(c);
+    if (orgResult instanceof Response) return orgResult;
+    const orgId = orgResult;
+
+    const [net] = await db.select().from(nets).where(eq(nets.id, netId)).limit(1);
+    if (!net) return c.json({ error: 'Not found' }, 404);
+    if (orgId && net.organizationId !== orgId) return c.json({ error: 'Not found' }, 404);
+
+    const rows = await db
+      .select()
+      .from(netEvents)
+      .where(eq(netEvents.netId, netId))
+      .orderBy(asc(netEvents.createdAt));
+    return c.json(rows);
+  })
+
+  // POST /nets/:id/events — add a manual comment entry (auth required, operator-attributed)
+  .post('/:id/events', requireAuth, zValidator('json', CreateNetEventSchema), async (c) => {
+    const netId = c.req.param('id') as string;
+    const operatorId = c.get('operatorId') as string;
+    const callsign = c.get('callsign') as string;
+    const body = c.req.valid('json');
+
+    const orgResult = await tryGetOrgId(c);
+    if (orgResult instanceof Response) return orgResult;
+    const orgId = orgResult;
+
+    const [net] = await db.select().from(nets).where(eq(nets.id, netId)).limit(1);
+    if (!net) return c.json({ error: 'Not found' }, 404);
+    if (orgId && net.organizationId !== orgId) return c.json({ error: 'Not found' }, 404);
+
+    const [created] = await db
+      .insert(netEvents)
+      .values({
+        id: newId(),
+        netId,
+        operatorId,
+        eventType: 'comment',
+        note: `[${callsign}] ${body.note}`,
+        createdAt: new Date().toISOString(),
+      })
+      .returning();
+    return c.json(created, 201);
   });

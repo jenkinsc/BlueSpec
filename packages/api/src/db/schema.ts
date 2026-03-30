@@ -69,6 +69,13 @@ export const checkIns = sqliteTable('check_ins', {
   signalReport: text('signal_report'), // RST scale e.g. "59", "579"
   remarks: text('remarks'),
   acknowledgedAt: text('acknowledged_at'),
+  // Location fields (BLUAAA-76)
+  gridSquare: text('grid_square'), // Maidenhead locator e.g. "EM28"
+  latitude: real('latitude'),
+  longitude: real('longitude'),
+  county: text('county'),
+  city: text('city'),
+  state: text('state'),
   checkedInAt: text('checked_in_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 });
@@ -132,6 +139,33 @@ export const orgInvites = sqliteTable('org_invites', {
   expiresAt: text('expires_at').notNull(),
   createdAt: text('created_at').notNull(),
 });
+
+// Net events — append-only timeline log per net (BLUAAA-75)
+export const NET_EVENT_TYPES = [
+  'check_in',
+  'check_out',
+  'status_change',
+  'role_change',
+  'mode_change',
+  'location_change',
+  'comment',
+  'net_open',
+  'net_close',
+] as const;
+
+export type NetEventType = typeof NET_EVENT_TYPES[number];
+
+export const netEvents = sqliteTable('net_events', {
+  id: text('id').primaryKey(),
+  netId: text('net_id').notNull().references(() => nets.id),
+  operatorId: text('operator_id'), // nullable — some events are system-generated
+  eventType: text('event_type').notNull(), // NetEventType
+  note: text('note'),
+  createdAt: text('created_at').notNull(),
+});
+
+export type NetEventRow = typeof netEvents.$inferSelect;
+export type NewNetEventRow = typeof netEvents.$inferInsert;
 
 export type OperatorRow = typeof operators.$inferSelect;
 export type NewOperatorRow = typeof operators.$inferInsert;

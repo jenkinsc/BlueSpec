@@ -187,6 +187,132 @@ function WeatherAlertsPanel({ netId }: { netId: string }) {
   );
 }
 
+// --- Net Timeline panel ---
+interface NetEvent {
+  id: string;
+  netId: string;
+  operatorId: string | null;
+  eventType: string;
+  note: string | null;
+  createdAt: string;
+}
+
+const EVENT_ICON: Record<string, string> = {
+  net_open: '🟢',
+  net_close: '🔴',
+  check_in: '✅',
+  check_out: '❌',
+  status_change: '🔄',
+  role_change: '🎭',
+  mode_change: '📻',
+  location_change: '📍',
+  comment: '💬',
+};
+
+function TimelinePanel({ netId, netStatus }: { netId: string; netStatus: string }) {
+  const [collapsed, setCollapsed] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [noteInput, setNoteInput] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
+
+  const { data: events = [], isLoading } = useQuery<NetEvent[]>({
+    queryKey: ['net-events', netId],
+    queryFn: () => apiFetch<NetEvent[]>(`/api/nets/${netId}/events`),
+    refetchInterval: netStatus === 'open' ? 15_000 : false,
+  });
+
+  const addComment = useMutation({
+    mutationFn: () =>
+      apiFetch<NetEvent>(`/api/nets/${netId}/events`, {
+        method: 'POST',
+        body: JSON.stringify({ note: noteInput }),
+      }),
+    onSuccess: () => {
+      setNoteInput('');
+      setShowForm(false);
+      setFormError(null);
+      void queryClient.invalidateQueries({ queryKey: ['net-events', netId] });
+    },
+    onError: (err) => {
+      setFormError(err instanceof Error ? err.message : 'Failed to post comment');
+    },
+  });
+
+  return (
+    <div className="border-b border-violet-200 bg-violet-50">
+      <div className="flex items-center justify-between px-4 py-2">
+        <button
+          onClick={() => setCollapsed((v) => !v)}
+          className="flex items-center gap-1 text-xs font-medium text-violet-700"
+        >
+          <span>Timeline{events.length > 0 ? ` (${events.length})` : ''}</span>
+          <span>{collapsed ? '▾' : '▴'}</span>
+        </button>
+        {!!token && netStatus === 'open' && (
+          <button
+            onClick={() => { setCollapsed(false); setShowForm((v) => !v); }}
+            className="text-xs font-medium text-violet-700 border border-violet-300 rounded px-2 py-0.5 hover:bg-violet-100"
+          >
+            + Comment
+          </button>
+        )}
+      </div>
+      {!collapsed && (
+        <div className="px-4 pb-2">
+          {showForm && (
+            <div className="mb-2 p-2 bg-white border border-violet-200 rounded">
+              {formError && <p className="text-xs text-red-600 mb-1">{formError}</p>}
+              <textarea
+                value={noteInput}
+                onChange={(e) => setNoteInput(e.target.value)}
+                placeholder="Add a comment…"
+                rows={2}
+                className="w-full border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400 resize-none"
+              />
+              <div className="flex gap-1 justify-end mt-1">
+                <button
+                  onClick={() => { setShowForm(false); setFormError(null); }}
+                  className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => addComment.mutate()}
+                  disabled={addComment.isPending || !noteInput.trim()}
+                  className="text-xs bg-violet-600 text-white rounded px-2 py-1 hover:bg-violet-700 disabled:opacity-50"
+                >
+                  {addComment.isPending ? 'Posting…' : 'Post'}
+                </button>
+              </div>
+            </div>
+          )}
+          {isLoading ? (
+            <p className="text-xs text-violet-400">Loading timeline…</p>
+          ) : events.length === 0 ? (
+            <p className="text-xs text-violet-400">No events yet.</p>
+          ) : (
+            <ul className="space-y-1.5 max-h-60 overflow-y-auto">
+              {[...events].reverse().map((ev) => (
+                <li key={ev.id} className="flex gap-1.5 items-start">
+                  <span className="text-xs shrink-0 mt-0.5">{EVENT_ICON[ev.eventType] ?? '•'}</span>
+                  <div className="min-w-0">
+                    <p className="text-xs text-gray-700 break-words">{ev.note ?? ev.eventType}</p>
+                    <p className="text-xs text-gray-400">
+                      {new Date(ev.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // --- Incident sidebar types ---
 interface Incident {
   id: string;
@@ -390,8 +516,31 @@ interface CheckIn {
   mode: CheckInMode | null;
   signalReport: string | null;
   remarks: string | null;
+  // Location fields (BLUAAA-76)
+  gridSquare: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  county: string | null;
+  city: string | null;
+  state: string | null;
   checkedInAt: string;
   updatedAt: string;
+}
+
+/** Convert lat/lon to 4-character Maidenhead grid square (e.g. "EM28") */
+function latLonToGrid(lat: number, lon: number): string {
+  const adjLon = lon + 180;
+  const adjLat = lat + 90;
+  const fieldLon = Math.floor(adjLon / 20);
+  const fieldLat = Math.floor(adjLat / 10);
+  const squareLon = Math.floor((adjLon % 20) / 2);
+  const squareLat = Math.floor(adjLat % 10);
+  return (
+    String.fromCharCode(65 + fieldLon) +
+    String.fromCharCode(65 + fieldLat) +
+    String(squareLon) +
+    String(squareLat)
+  );
 }
 
 type TrafficType = 'routine' | 'welfare' | 'priority' | 'emergency';
@@ -471,11 +620,15 @@ function NetStatusBar({
 function CheckInListItem({
   checkIn,
   canRemove,
+  canEdit,
   onRemove,
+  onEdit,
 }: {
   checkIn: CheckIn;
   canRemove: boolean;
+  canEdit: boolean;
   onRemove: () => void;
+  onEdit: () => void;
 }) {
   const [confirming, setConfirming] = useState(false);
 
@@ -507,39 +660,202 @@ function CheckInListItem({
         {checkIn.remarks && (
           <span className="text-xs text-gray-500 truncate">{checkIn.remarks}</span>
         )}
+        {checkIn.gridSquare && (
+          <span className="text-xs font-mono text-indigo-600 shrink-0" title="Grid square">
+            {checkIn.gridSquare}
+          </span>
+        )}
       </div>
-      {canRemove && (
-        <div className="ml-2 flex-shrink-0">
-          {confirming ? (
-            <div className="flex items-center gap-1">
+      <div className="ml-2 flex-shrink-0 flex items-center gap-1">
+        {canEdit && (
+          <button
+            onClick={onEdit}
+            className="text-xs text-gray-400 hover:text-indigo-500 transition-colors px-1"
+            aria-label="Edit location"
+            title="Edit location"
+          >
+            ⌖
+          </button>
+        )}
+        {canRemove && (
+          <>
+            {confirming ? (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => {
+                    setConfirming(false);
+                    onRemove();
+                  }}
+                  className="text-xs text-red-600 font-medium hover:text-red-800"
+                >
+                  Remove
+                </button>
+                <button
+                  onClick={() => setConfirming(false)}
+                  className="text-xs text-gray-400 hover:text-gray-600"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
               <button
-                onClick={() => {
-                  setConfirming(false);
-                  onRemove();
-                }}
-                className="text-xs text-red-600 font-medium hover:text-red-800"
+                onClick={() => setConfirming(true)}
+                className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                aria-label="Remove check-in"
               >
-                Remove
+                ×
               </button>
-              <button
-                onClick={() => setConfirming(false)}
-                className="text-xs text-gray-400 hover:text-gray-600"
-              >
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setConfirming(true)}
-              className="text-xs text-gray-400 hover:text-red-500 transition-colors"
-              aria-label="Remove check-in"
-            >
-              ×
-            </button>
-          )}
-        </div>
-      )}
+            )}
+          </>
+        )}
+      </div>
     </li>
+  );
+}
+
+function CheckInEditPanel({
+  checkIn,
+  netId,
+  onClose,
+  onSaved,
+}: {
+  checkIn: CheckIn;
+  netId: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [grid, setGrid] = useState(checkIn.gridSquare ?? '');
+  const [lat, setLat] = useState(checkIn.latitude != null ? String(checkIn.latitude) : '');
+  const [lon, setLon] = useState(checkIn.longitude != null ? String(checkIn.longitude) : '');
+  const [county, setCounty] = useState(checkIn.county ?? '');
+  const [city, setCity] = useState(checkIn.city ?? '');
+  const [state, setState] = useState(checkIn.state ?? '');
+  const [error, setError] = useState<string | null>(null);
+
+  const queryClient = useQueryClient();
+
+  // Auto-calculate grid when lat/lon are both valid
+  const handleLatLonBlur = () => {
+    const latNum = parseFloat(lat);
+    const lonNum = parseFloat(lon);
+    if (!isNaN(latNum) && !isNaN(lonNum) &&
+        latNum >= -90 && latNum <= 90 &&
+        lonNum >= -180 && lonNum <= 180) {
+      setGrid(latLonToGrid(latNum, lonNum));
+    }
+  };
+
+  const mutation = useMutation({
+    mutationFn: () => {
+      const body: Record<string, unknown> = {};
+      if (grid !== (checkIn.gridSquare ?? '')) body.grid_square = grid || undefined;
+      const latNum = lat !== '' ? parseFloat(lat) : undefined;
+      const lonNum = lon !== '' ? parseFloat(lon) : undefined;
+      if (latNum !== undefined && !isNaN(latNum)) body.latitude = latNum;
+      if (lonNum !== undefined && !isNaN(lonNum)) body.longitude = lonNum;
+      if (county !== (checkIn.county ?? '')) body.county = county || undefined;
+      if (city !== (checkIn.city ?? '')) body.city = city || undefined;
+      if (state !== (checkIn.state ?? '')) body.state = state || undefined;
+      return apiFetch<CheckIn>(`/api/nets/${netId}/check-ins/${checkIn.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      });
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['check-ins', netId] });
+      onSaved();
+    },
+    onError: (err) => {
+      setError(err instanceof Error ? err.message : 'Save failed');
+    },
+  });
+
+  return (
+    <div className="border border-indigo-200 rounded-md bg-indigo-50 p-3 mx-4 my-2">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-semibold text-indigo-800">
+          Location — {checkIn.operatorCallsign}
+        </span>
+        <button onClick={onClose} className="text-xs text-gray-400 hover:text-gray-600">✕</button>
+      </div>
+      {error && <p className="text-xs text-red-600 mb-2">{error}</p>}
+      <div className="grid grid-cols-2 gap-2 mb-2">
+        <div>
+          <label className="block text-xs text-gray-500 mb-0.5">Grid Square</label>
+          <input
+            value={grid}
+            onChange={(e) => setGrid(e.target.value.toUpperCase())}
+            className="w-full border border-gray-300 rounded px-2 py-1 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            placeholder="EM28"
+            maxLength={6}
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-0.5">County</label>
+          <input
+            value={county}
+            onChange={(e) => setCounty(e.target.value)}
+            className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            placeholder="County"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-0.5">Latitude</label>
+          <input
+            value={lat}
+            onChange={(e) => setLat(e.target.value)}
+            onBlur={handleLatLonBlur}
+            className="w-full border border-gray-300 rounded px-2 py-1 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            placeholder="38.8977"
+            type="number"
+            step="any"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-0.5">Longitude</label>
+          <input
+            value={lon}
+            onChange={(e) => setLon(e.target.value)}
+            onBlur={handleLatLonBlur}
+            className="w-full border border-gray-300 rounded px-2 py-1 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            placeholder="-77.0366"
+            type="number"
+            step="any"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-0.5">City</label>
+          <input
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            placeholder="City"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-0.5">State</label>
+          <input
+            value={state}
+            onChange={(e) => setState(e.target.value)}
+            className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            placeholder="State"
+            maxLength={2}
+          />
+        </div>
+      </div>
+      <div className="flex justify-end gap-2">
+        <button onClick={onClose} className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1">
+          Cancel
+        </button>
+        <button
+          onClick={() => mutation.mutate()}
+          disabled={mutation.isPending}
+          className="text-xs bg-indigo-600 text-white rounded px-3 py-1 hover:bg-indigo-700 disabled:opacity-50"
+        >
+          {mutation.isPending ? 'Saving…' : 'Save Location'}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -727,6 +1043,7 @@ export function NetSessionPage() {
   const navigate = useNavigate();
   const { callsign } = useAuth();
   const queryClient = useQueryClient();
+  const [editingCheckInId, setEditingCheckInId] = useState<string | null>(null);
 
   const netQuery = useQuery<NetRow>({
     queryKey: ['net', id],
@@ -802,6 +1119,7 @@ export function NetSessionPage() {
         />
         <IncidentSidebar netId={id!} />
         <WeatherAlertsPanel netId={id!} />
+        <TimelinePanel netId={id!} netStatus={net.status} />
       </div>
 
       {/* Main body: two columns on desktop, single column on mobile */}
@@ -829,12 +1147,23 @@ export function NetSessionPage() {
             ) : (
               <ul>
                 {sortedCheckIns.map((ci) => (
-                  <CheckInListItem
-                    key={ci.id}
-                    checkIn={ci}
-                    canRemove={isNetControl && net.status === 'open'}
-                    onRemove={() => removeCheckIn.mutate(ci.id)}
-                  />
+                  <li key={ci.id}>
+                    <CheckInListItem
+                      checkIn={ci}
+                      canRemove={isNetControl && net.status === 'open'}
+                      canEdit={isNetControl}
+                      onRemove={() => removeCheckIn.mutate(ci.id)}
+                      onEdit={() => setEditingCheckInId((prev) => prev === ci.id ? null : ci.id)}
+                    />
+                    {editingCheckInId === ci.id && (
+                      <CheckInEditPanel
+                        checkIn={ci}
+                        netId={id!}
+                        onClose={() => setEditingCheckInId(null)}
+                        onSaved={() => setEditingCheckInId(null)}
+                      />
+                    )}
+                  </li>
                 ))}
               </ul>
             )}
@@ -873,6 +1202,7 @@ export function NetSessionPage() {
           />
           <IncidentSidebar netId={id!} />
           <WeatherAlertsPanel netId={id!} />
+          <TimelinePanel netId={id!} netStatus={net.status} />
         </div>
       </div>
     </div>

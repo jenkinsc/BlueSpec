@@ -64,6 +64,20 @@
       "when": 1774811410000,
       "tag": "0008_check_ins_role_mode",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1774811411000,
+      "tag": "0009_net_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1774811412000,
+      "tag": "0010_check_ins_location",
+      "breakpoints": true
     }
   ]
 }
