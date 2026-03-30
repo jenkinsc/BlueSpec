@@ -735,71 +735,90 @@ export function NetSessionPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <NetStatusBar
-        net={net}
-        checkInCount={checkIns.length}
-        isNetControl={isNetControl}
-        onCloseNet={() => closeMutation.mutate()}
-        closing={closeMutation.isPending}
-      />
-
-      {/* Incident sidebar */}
-      <IncidentSidebar netId={id!} />
-
-      {/* Weather alerts panel */}
-      <WeatherAlertsPanel netId={id!} />
-
-      {/* Back link */}
-      <div className="px-4 pt-2 pb-1">
-        <button
-          onClick={() => navigate('/')}
-          className="text-xs text-indigo-600 hover:underline"
-        >
-          ← All Nets
-        </button>
+      {/* Mobile: stacked status + sidebars at top */}
+      <div className="md:hidden shrink-0">
+        <NetStatusBar
+          net={net}
+          checkInCount={checkIns.length}
+          isNetControl={isNetControl}
+          onCloseNet={() => closeMutation.mutate()}
+          closing={closeMutation.isPending}
+        />
+        <IncidentSidebar netId={id!} />
+        <WeatherAlertsPanel netId={id!} />
       </div>
 
-      {/* Check-in list */}
-      <div className="flex-1 overflow-y-auto">
-        {checkInsQuery.isLoading && checkIns.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-gray-400">Loading check-ins…</div>
-        ) : sortedCheckIns.length === 0 ? (
-          <div className="px-4 py-12 text-center text-sm text-gray-400">
-            No check-ins yet.
-            {net.status === 'open' ? ' Use the form below to check in.' : ''}
-          </div>
-        ) : (
-          <ul>
-            {sortedCheckIns.map((ci) => (
-              <CheckInListItem
-                key={ci.id}
-                checkIn={ci}
-                canRemove={isNetControl && net.status === 'open'}
-                onRemove={() => removeCheckIn.mutate(ci.id)}
-              />
-            ))}
-          </ul>
-        )}
-        {net.status === 'closed' && (
-          <div className="px-4 py-4 text-center">
+      {/* Main body: two columns on desktop, single column on mobile */}
+      <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
+        {/* Left column (~60%): back link + check-in list + entry form */}
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+          <div className="px-4 pt-2 pb-1 shrink-0">
             <button
-              onClick={() => navigate(`/nets/${id}/summary`)}
-              className="text-sm text-indigo-600 hover:underline font-medium"
+              onClick={() => navigate('/')}
+              className="text-xs text-indigo-600 hover:underline"
             >
-              View Closing Summary →
+              ← All Nets
             </button>
           </div>
-        )}
-      </div>
 
-      {/* Entry form — only for open nets */}
-      <CheckInEntryForm
-        netId={id!}
-        netOpen={net.status === 'open'}
-        callsign={callsign ?? ''}
-        isNetControl={isNetControl}
-        onCheckedIn={() => void queryClient.invalidateQueries({ queryKey: ['check-ins', id] })}
-      />
+          {/* Check-in list */}
+          <div className="flex-1 overflow-y-auto">
+            {checkInsQuery.isLoading && checkIns.length === 0 ? (
+              <div className="px-4 py-8 text-center text-sm text-gray-400">Loading check-ins…</div>
+            ) : sortedCheckIns.length === 0 ? (
+              <div className="px-4 py-8 text-center text-sm text-gray-400">
+                No check-ins yet.
+                {net.status === 'open' ? ' Use the form below to check in.' : ''}
+              </div>
+            ) : (
+              <ul>
+                {sortedCheckIns.map((ci) => (
+                  <CheckInListItem
+                    key={ci.id}
+                    checkIn={ci}
+                    canRemove={isNetControl && net.status === 'open'}
+                    onRemove={() => removeCheckIn.mutate(ci.id)}
+                  />
+                ))}
+              </ul>
+            )}
+            {net.status === 'closed' && (
+              <div className="px-4 py-4 text-center">
+                <button
+                  onClick={() => navigate(`/nets/${id}/summary`)}
+                  className="text-sm text-indigo-600 hover:underline font-medium"
+                >
+                  View Closing Summary →
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Entry form — pinned to bottom of left column */}
+          <div className="shrink-0">
+            <CheckInEntryForm
+              netId={id!}
+              netOpen={net.status === 'open'}
+              callsign={callsign ?? ''}
+              isNetControl={isNetControl}
+              onCheckedIn={() => void queryClient.invalidateQueries({ queryKey: ['check-ins', id] })}
+            />
+          </div>
+        </div>
+
+        {/* Right column (~40%): desktop only — status bar, incident sidebar, weather */}
+        <div className="hidden md:flex md:flex-col md:w-2/5 shrink-0 border-l border-gray-200 overflow-y-auto">
+          <NetStatusBar
+            net={net}
+            checkInCount={checkIns.length}
+            isNetControl={isNetControl}
+            onCloseNet={() => closeMutation.mutate()}
+            closing={closeMutation.isPending}
+          />
+          <IncidentSidebar netId={id!} />
+          <WeatherAlertsPanel netId={id!} />
+        </div>
+      </div>
     </div>
   );
 }
