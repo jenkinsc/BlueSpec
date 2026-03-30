@@ -4,6 +4,189 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '../../lib/api.js';
 import { useAuth } from '../../lib/auth.tsx';
 
+// --- NWS Weather Alerts panel ---
+interface NWSAlert {
+  id: string;
+  properties: {
+    event: string;
+    severity: string;
+    onset: string | null;
+    expires: string | null;
+  };
+}
+
+interface NWSAlertsResponse {
+  features: NWSAlert[];
+}
+
+const SEVERITY_BADGE: Record<string, string> = {
+  Extreme: 'bg-red-100 text-red-800',
+  Severe: 'bg-orange-100 text-orange-800',
+  Moderate: 'bg-yellow-100 text-yellow-800',
+  Minor: 'bg-blue-100 text-blue-700',
+  Unknown: 'bg-gray-100 text-gray-600',
+};
+
+function formatAlertTime(iso: string): string {
+  return new Date(iso).toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function WeatherAlertsPanel({ netId }: { netId: string }) {
+  const storageKey = `nws_wfo_net_${netId}`;
+  const [collapsed, setCollapsed] = useState(false);
+  const [wfo, setWfo] = useState<string>(() => localStorage.getItem(storageKey) ?? '');
+  const [editingWfo, setEditingWfo] = useState(false);
+  const [wfoInput, setWfoInput] = useState('');
+
+  const { data, isLoading, isError } = useQuery<NWSAlertsResponse>({
+    queryKey: ['nws-alerts', wfo],
+    queryFn: async () => {
+      const res = await fetch(`https://api.weather.gov/alerts/active?office=${wfo}`, {
+        headers: { Accept: 'application/geo+json' },
+      });
+      if (!res.ok) throw new Error(`NWS API error: ${res.status}`);
+      return res.json() as Promise<NWSAlertsResponse>;
+    },
+    enabled: !!wfo,
+    refetchInterval: 5 * 60 * 1000,
+    staleTime: 4 * 60 * 1000,
+  });
+
+  const alerts = data?.features ?? [];
+
+  const saveWfo = () => {
+    const val = wfoInput.trim().toUpperCase();
+    setWfo(val);
+    if (val) {
+      localStorage.setItem(storageKey, val);
+    } else {
+      localStorage.removeItem(storageKey);
+    }
+    setEditingWfo(false);
+  };
+
+  const openEdit = () => {
+    setWfoInput(wfo);
+    setEditingWfo(true);
+    setCollapsed(false);
+  };
+
+  return (
+    <div className="border-b border-sky-200 bg-sky-50">
+      <div className="flex items-center justify-between px-4 py-2">
+        <button
+          onClick={() => setCollapsed((v) => !v)}
+          className="flex items-center gap-1 text-xs font-medium text-sky-700"
+        >
+          <span>Weather Alerts{alerts.length > 0 ? ` (${alerts.length})` : ''}</span>
+          <span>{collapsed ? '▾' : '▴'}</span>
+        </button>
+        <button
+          onClick={openEdit}
+          className="text-xs text-sky-600 hover:text-sky-800 px-1"
+          title="Configure NWS office"
+          aria-label="Configure NWS office"
+        >
+          ⚙
+        </button>
+      </div>
+      {!collapsed && (
+        <div className="px-4 pb-2">
+          {editingWfo && (
+            <div className="mb-2 p-2 bg-white border border-sky-200 rounded">
+              <p className="text-xs text-gray-500 mb-1">
+                Enter a{' '}
+                <a
+                  href="https://www.weather.gov/srh/nwsoffices"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-indigo-600 hover:underline"
+                >
+                  NWS WFO code
+                </a>{' '}
+                (e.g. LWX, OKX, LOT)
+              </p>
+              <div className="flex gap-1">
+                <input
+                  value={wfoInput}
+                  onChange={(e) => setWfoInput(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') saveWfo();
+                    if (e.key === 'Escape') setEditingWfo(false);
+                  }}
+                  placeholder="e.g. LWX"
+                  maxLength={4}
+                  className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-sky-400"
+                  autoFocus
+                />
+                <button
+                  onClick={saveWfo}
+                  className="text-xs bg-sky-600 text-white rounded px-2 py-1 hover:bg-sky-700"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => setEditingWfo(false)}
+                  className="text-xs text-gray-500 hover:text-gray-700 px-1"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+          {!wfo ? (
+            <p className="text-xs text-sky-500">
+              Set NWS office to see alerts.{' '}
+              <button onClick={openEdit} className="text-indigo-600 hover:underline">
+                Configure
+              </button>
+            </p>
+          ) : isLoading ? (
+            <p className="text-xs text-sky-400">Loading alerts…</p>
+          ) : isError ? (
+            <p className="text-xs text-red-500">Failed to fetch weather alerts.</p>
+          ) : alerts.length === 0 ? (
+            <p className="text-xs text-sky-400">No active alerts for {wfo}.</p>
+          ) : (
+            <ul className="space-y-1.5">
+              {alerts.map((alert) => (
+                <li key={alert.id}>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-xs font-medium text-gray-900">{alert.properties.event}</span>
+                    <span
+                      className={`text-xs font-medium px-1.5 py-0.5 rounded ${
+                        SEVERITY_BADGE[alert.properties.severity] ?? SEVERITY_BADGE.Unknown
+                      }`}
+                    >
+                      {alert.properties.severity}
+                    </span>
+                  </div>
+                  {(alert.properties.onset ?? alert.properties.expires) && (
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {alert.properties.onset && (
+                        <span>From {formatAlertTime(alert.properties.onset)}</span>
+                      )}
+                      {alert.properties.onset && alert.properties.expires && <span> · </span>}
+                      {alert.properties.expires && (
+                        <span>Until {formatAlertTime(alert.properties.expires)}</span>
+                      )}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // --- Incident sidebar types ---
 interface Incident {
   id: string;
@@ -562,6 +745,9 @@ export function NetSessionPage() {
 
       {/* Incident sidebar */}
       <IncidentSidebar netId={id!} />
+
+      {/* Weather alerts panel */}
+      <WeatherAlertsPanel netId={id!} />
 
       {/* Back link */}
       <div className="px-4 pt-2 pb-1">
