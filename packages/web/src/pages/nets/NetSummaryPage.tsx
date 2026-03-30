@@ -64,6 +64,138 @@ function formatDateTime(iso: string): string {
   });
 }
 
+// --- HTML escape helper ---
+function escHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// --- ICS-309 export ---
+function openIcs309(net: NetRow, checkIns: CheckIn[]): void {
+  const sorted = [...checkIns].sort(
+    (a, b) => new Date(a.checkedInAt).getTime() - new Date(b.checkedInAt).getTime(),
+  );
+
+  const dateStr = net.openedAt
+    ? new Date(net.openedAt).toLocaleDateString([], {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      })
+    : new Date().toLocaleDateString([], { year: 'numeric', month: '2-digit', day: '2-digit' });
+
+  const timeFrom = net.openedAt ? formatTime(net.openedAt) : '';
+  const timeTo = net.closedAt ? formatTime(net.closedAt) : '';
+
+  const rows = sorted
+    .map(
+      (ci, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td>${escHtml(formatTime(ci.checkedInAt))}</td>
+        <td>${escHtml(ci.operatorCallsign)}</td>
+        <td>${escHtml(ci.trafficType)}</td>
+        <td>${escHtml(ci.signalReport ?? '')}</td>
+        <td>${escHtml(ci.remarks ?? '')}</td>
+      </tr>`,
+    )
+    .join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ICS-309 – ${escHtml(net.name)}</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #000; background: #fff; padding: 12mm; }
+    h1 { font-size: 14pt; text-align: center; margin-bottom: 2pt; }
+    .form-title { text-align: center; font-size: 9pt; color: #444; margin-bottom: 8pt; }
+    .header-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4pt 16pt; margin-bottom: 10pt; border: 1px solid #000; padding: 6pt; }
+    .field { display: flex; flex-direction: column; }
+    .field label { font-size: 7pt; font-weight: bold; text-transform: uppercase; color: #555; margin-bottom: 1pt; }
+    .field span { font-size: 10pt; border-bottom: 1px solid #aaa; min-height: 14pt; line-height: 14pt; padding-left: 2pt; }
+    .field.wide { grid-column: 1 / -1; }
+    .period-row { display: flex; gap: 12pt; }
+    .period-row .field { flex: 1; }
+    table { width: 100%; border-collapse: collapse; margin-top: 6pt; font-size: 9pt; }
+    thead tr { background: #000; color: #fff; }
+    thead th { padding: 4pt 5pt; text-align: left; font-size: 8pt; font-weight: bold; }
+    tbody tr:nth-child(even) { background: #f5f5f5; }
+    tbody td { padding: 3pt 5pt; border-bottom: 1px solid #ddd; vertical-align: top; }
+    td:first-child, th:first-child { text-align: center; width: 28pt; }
+    td:nth-child(2), th:nth-child(2) { width: 44pt; }
+    td:nth-child(3), th:nth-child(3) { width: 72pt; font-family: monospace; font-weight: bold; }
+    td:nth-child(4), th:nth-child(4) { width: 60pt; }
+    td:nth-child(5), th:nth-child(5) { width: 36pt; }
+    .footer { margin-top: 10pt; font-size: 8pt; color: #666; text-align: right; }
+    @media print {
+      body { padding: 10mm; }
+      button { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <h1>ICS 309 – Communications Log</h1>
+  <p class="form-title">Incident Command System</p>
+
+  <div class="header-grid">
+    <div class="field wide">
+      <label>1. Incident / Net Name</label>
+      <span>${escHtml(net.name)}</span>
+    </div>
+    <div class="field">
+      <label>2. Date</label>
+      <span>${escHtml(dateStr)}</span>
+    </div>
+    <div class="field">
+      <label>3. Operational Period</label>
+      <span>${escHtml(timeFrom)}${timeTo ? ' – ' + escHtml(timeTo) : ''}</span>
+    </div>
+    <div class="field">
+      <label>4. Net Control / Radio Operator</label>
+      <span>${escHtml(net.netControl)}</span>
+    </div>
+    <div class="field">
+      <label>5. Station ID / Frequency</label>
+      <span>${escHtml(net.frequency.toFixed(3))} MHz – ${escHtml(net.mode)}</span>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Time</th>
+        <th>Callsign</th>
+        <th>Traffic</th>
+        <th>RST</th>
+        <th>Remarks / Message</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows || '<tr><td colspan="6" style="text-align:center;color:#888;padding:8pt">No check-ins recorded</td></tr>'}
+    </tbody>
+  </table>
+
+  <div class="footer">
+    ICS 309 · ${escHtml(net.name)} · Prepared ${escHtml(new Date().toLocaleString())}
+  </div>
+
+  <script>window.onload = function() { window.print(); }</script>
+</body>
+</html>`;
+
+  const w = window.open('', '_blank');
+  if (w) {
+    w.document.write(html);
+    w.document.close();
+  }
+}
+
 // --- CSV export ---
 function buildCsvBlob(net: NetRow, checkIns: CheckIn[]): Blob {
   const header = ['#', 'Callsign', 'Time', 'RST', 'Traffic', 'Remarks'];
@@ -334,6 +466,12 @@ export function NetSummaryPage() {
               className="text-xs font-medium text-gray-600 border border-gray-300 rounded px-3 py-1.5 hover:bg-gray-50"
             >
               Export CSV
+            </button>
+            <button
+              onClick={() => openIcs309(net, checkIns)}
+              className="text-xs font-medium text-gray-600 border border-gray-300 rounded px-3 py-1.5 hover:bg-gray-50"
+            >
+              ICS-309
             </button>
             <button
               onClick={() => void downloadPdf(net, checkIns)}
