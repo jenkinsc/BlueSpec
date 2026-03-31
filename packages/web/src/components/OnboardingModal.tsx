@@ -21,8 +21,7 @@ const STEPS = [
   },
   {
     title: 'Invite your first member',
-    description:
-      'Once you have an org, invite other operators by email from the Org page.',
+    description: 'Once you have an org, invite other operators by email from the Org page.',
     action: '/org',
     actionLabel: 'Go to Org →',
   },

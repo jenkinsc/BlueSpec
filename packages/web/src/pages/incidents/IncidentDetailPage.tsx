@@ -107,7 +107,11 @@ export function IncidentDetailPage() {
   const queryClient = useQueryClient();
   const logEndRef = useRef<HTMLDivElement>(null);
 
-  const { data: incident, isLoading, isError } = useQuery<IncidentDetail>({
+  const {
+    data: incident,
+    isLoading,
+    isError,
+  } = useQuery<IncidentDetail>({
     queryKey: ['incident', id],
     queryFn: () => apiFetch<IncidentDetail>(`/api/incidents/${id}`),
   });
@@ -131,7 +135,9 @@ export function IncidentDetailPage() {
   }, [incident?.activities?.length]);
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-full text-sm text-gray-400">Loading…</div>;
+    return (
+      <div className="flex items-center justify-center h-full text-sm text-gray-400">Loading…</div>
+    );
   }
 
   if (isError || !incident) {
@@ -177,7 +183,9 @@ export function IncidentDetailPage() {
           {incident.activationLevel && (
             <>
               <dt className="font-medium text-gray-700">Level</dt>
-              <dd>{incident.activationLevel} – {LEVEL_LABELS[incident.activationLevel]}</dd>
+              <dd>
+                {incident.activationLevel} – {LEVEL_LABELS[incident.activationLevel]}
+              </dd>
             </>
           )}
           {incident.servedAgency && (

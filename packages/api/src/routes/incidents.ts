@@ -106,7 +106,11 @@ export const incidentsRouter = new Hono()
 
     // Validate net_id if provided
     if (body.net_id) {
-      const [net] = await db.select({ id: nets.id }).from(nets).where(eq(nets.id, body.net_id)).limit(1);
+      const [net] = await db
+        .select({ id: nets.id })
+        .from(nets)
+        .where(eq(nets.id, body.net_id))
+        .limit(1);
       if (!net) return c.json({ error: 'net_not_found' }, 422);
     }
 
@@ -150,7 +154,10 @@ export const incidentsRouter = new Hono()
     }
 
     if (row.createdByOperatorId && row.createdByOperatorId !== operatorId) {
-      return c.json({ error: 'Forbidden: only the incident creator may update this incident' }, 403);
+      return c.json(
+        { error: 'Forbidden: only the incident creator may update this incident' },
+        403,
+      );
     }
 
     // Enforce forward-only status transitions
@@ -160,23 +167,33 @@ export const incidentsRouter = new Hono()
 
       // Terminal states: resolved and cancelled cannot transition further
       if (row.status === 'resolved' || row.status === 'cancelled') {
-        return c.json({ error: `Conflict: incident is already ${row.status}; no further transitions allowed` }, 409);
+        return c.json(
+          { error: `Conflict: incident is already ${row.status}; no further transitions allowed` },
+          409,
+        );
       }
 
       // For the main chain (reported/active/resolved), reject backwards moves
       if (currentOrder !== undefined && newOrder !== undefined && newOrder < currentOrder) {
-        return c.json({ error: `Conflict: cannot transition from ${row.status} to ${body.status}` }, 409);
+        return c.json(
+          { error: `Conflict: cannot transition from ${row.status} to ${body.status}` },
+          409,
+        );
       }
 
       // cancelled is only allowed from reported or active
-      if (body.status === 'cancelled' && (row.status === 'resolved')) {
+      if (body.status === 'cancelled' && row.status === 'resolved') {
         return c.json({ error: `Conflict: cannot cancel a resolved incident` }, 409);
       }
     }
 
     // Validate net_id if being updated
     if (body.net_id !== undefined && body.net_id !== null) {
-      const [net] = await db.select({ id: nets.id }).from(nets).where(eq(nets.id, body.net_id)).limit(1);
+      const [net] = await db
+        .select({ id: nets.id })
+        .from(nets)
+        .where(eq(nets.id, body.net_id))
+        .limit(1);
       if (!net) return c.json({ error: 'net_not_found' }, 422);
     }
 

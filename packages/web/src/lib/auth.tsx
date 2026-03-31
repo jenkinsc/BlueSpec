@@ -1,10 +1,4 @@
-import {
-  createContext,
-  useContext,
-  useState,
-  useCallback,
-  type ReactNode,
-} from 'react';
+import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 
 interface AuthState {
   token: string | null;
@@ -83,22 +77,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuth({ token: data.token, callsign: data.operator.callsign, orgId });
   }, []);
 
-  const register = useCallback(async (callsign: string, name: string, password: string, email?: string) => {
-    const res = await fetch('/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ callsign, name, password, ...(email ? { email } : {}) }),
-    });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
-      throw new Error(body.error ?? 'Registration failed');
-    }
-    const data = (await res.json()) as { token: string; operator: { callsign: string } };
-    localStorage.setItem(TOKEN_KEY, data.token);
-    localStorage.setItem(CALLSIGN_KEY, data.operator.callsign);
-    const orgId = await fetchAndStoreOrg(data.token);
-    setAuth({ token: data.token, callsign: data.operator.callsign, orgId });
-  }, []);
+  const register = useCallback(
+    async (callsign: string, name: string, password: string, email?: string) => {
+      const res = await fetch('/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ callsign, name, password, ...(email ? { email } : {}) }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? 'Registration failed');
+      }
+      const data = (await res.json()) as { token: string; operator: { callsign: string } };
+      localStorage.setItem(TOKEN_KEY, data.token);
+      localStorage.setItem(CALLSIGN_KEY, data.operator.callsign);
+      const orgId = await fetchAndStoreOrg(data.token);
+      setAuth({ token: data.token, callsign: data.operator.callsign, orgId });
+    },
+    [],
+  );
 
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);

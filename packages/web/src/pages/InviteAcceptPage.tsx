@@ -93,8 +93,7 @@ export function InviteAcceptPage() {
         <h1 className="text-lg font-semibold text-gray-900 mb-1">You're invited!</h1>
         <p className="text-sm text-gray-500 mb-5">
           <strong className="font-mono text-gray-700">{invite.invitedBy.callsign}</strong> has
-          invited you to join{' '}
-          <strong className="text-gray-900">{invite.organization.name}</strong>.
+          invited you to join <strong className="text-gray-900">{invite.organization.name}</strong>.
         </p>
 
         {invite.organization.callsign && (

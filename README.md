@@ -64,14 +64,14 @@ npm run dev:web
 
 ## Common Commands
 
-| Command | Description |
-|---|---|
-| `npm run lint` | Run ESLint across all packages |
-| `npm run format` | Auto-format with Prettier |
-| `npm run format:check` | Check formatting without writing |
-| `npm run typecheck` | TypeScript type-check all packages |
-| `npm run build` | Build all packages |
-| `npm test` | Run tests across all packages |
+| Command                | Description                        |
+| ---------------------- | ---------------------------------- |
+| `npm run lint`         | Run ESLint across all packages     |
+| `npm run format`       | Auto-format with Prettier          |
+| `npm run format:check` | Check formatting without writing   |
+| `npm run typecheck`    | TypeScript type-check all packages |
+| `npm run build`        | Build all packages                 |
+| `npm test`             | Run tests across all packages      |
 
 ## CI
 

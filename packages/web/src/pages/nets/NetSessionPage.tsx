@@ -148,7 +148,9 @@ function WeatherAlertsPanel({ netId }: { netId: string }) {
               {alerts.map((alert) => (
                 <li key={alert.id}>
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-xs font-medium text-gray-900">{alert.properties.event}</span>
+                    <span className="text-xs font-medium text-gray-900">
+                      {alert.properties.event}
+                    </span>
                     <span
                       className={`text-xs font-medium px-1.5 py-0.5 rounded ${
                         SEVERITY_BADGE[alert.properties.severity] ?? SEVERITY_BADGE.Unknown
@@ -243,7 +245,10 @@ function TimelinePanel({ netId, netStatus }: { netId: string; netStatus: string 
         </button>
         {!!token && netStatus === 'open' && (
           <button
-            onClick={() => { setCollapsed(false); setShowForm((v) => !v); }}
+            onClick={() => {
+              setCollapsed(false);
+              setShowForm((v) => !v);
+            }}
             className="text-xs font-medium text-violet-700 border border-violet-300 rounded px-2 py-0.5 hover:bg-violet-100"
           >
             + Comment
@@ -264,7 +269,10 @@ function TimelinePanel({ netId, netStatus }: { netId: string; netStatus: string 
               />
               <div className="flex gap-1 justify-end mt-1">
                 <button
-                  onClick={() => { setShowForm(false); setFormError(null); }}
+                  onClick={() => {
+                    setShowForm(false);
+                    setFormError(null);
+                  }}
                   className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1"
                 >
                   Cancel
@@ -291,7 +299,10 @@ function TimelinePanel({ netId, netStatus }: { netId: string; netStatus: string 
                   <div className="min-w-0">
                     <p className="text-xs text-gray-700 break-words">{ev.note ?? ev.eventType}</p>
                     <p className="text-xs text-gray-400">
-                      {new Date(ev.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {new Date(ev.createdAt).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
                     </p>
                   </div>
                 </li>
@@ -377,7 +388,10 @@ function IncidentSidebar({ netId }: { netId: string }) {
           <span>{collapsed ? '▾' : '▴'}</span>
         </button>
         <button
-          onClick={() => { setCollapsed(false); setShowForm((v) => !v); }}
+          onClick={() => {
+            setCollapsed(false);
+            setShowForm((v) => !v);
+          }}
           className="text-xs font-medium text-orange-700 border border-orange-300 rounded px-2 py-0.5 hover:bg-orange-100"
         >
           + New Incident
@@ -412,7 +426,10 @@ function IncidentSidebar({ netId }: { netId: string }) {
                 </select>
                 <div className="flex gap-1 justify-end">
                   <button
-                    onClick={() => { setShowForm(false); setFormError(null); }}
+                    onClick={() => {
+                      setShowForm(false);
+                      setFormError(null);
+                    }}
                     className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1"
                   >
                     Cancel
@@ -438,7 +455,8 @@ function IncidentSidebar({ netId }: { netId: string }) {
                     onClick={() => navigate(`/incidents/${i.id}`)}
                     className="text-xs text-orange-800 hover:underline text-left"
                   >
-                    {i.title}{i.incidentType ? ` — ${i.incidentType}` : ''}
+                    {i.title}
+                    {i.incidentType ? ` — ${i.incidentType}` : ''}
                   </button>
                 </li>
               ))}
@@ -466,7 +484,8 @@ function IncidentSidebar({ netId }: { netId: string }) {
                       onClick={() => navigate(`/incidents/${i.id}`)}
                       className="text-xs text-orange-700 hover:underline text-left"
                     >
-                      {i.title}{i.incidentType ? ` — ${i.incidentType}` : ''}
+                      {i.title}
+                      {i.incidentType ? ` — ${i.incidentType}` : ''}
                     </button>
                   </li>
                 ))}
@@ -543,7 +562,15 @@ const TRAFFIC_BADGE: Record<TrafficType, string> = {
   emergency: 'bg-red-100 text-red-700',
 };
 
-const CHECKIN_ROLES: CheckInRole[] = ['NET_CONTROL', 'RELAY', 'MOBILE', 'PORTABLE', 'FIXED', 'EOC', 'EMCOMM'];
+const CHECKIN_ROLES: CheckInRole[] = [
+  'NET_CONTROL',
+  'RELAY',
+  'MOBILE',
+  'PORTABLE',
+  'FIXED',
+  'EOC',
+  'EMCOMM',
+];
 const CHECKIN_MODES: CheckInMode[] = ['SSB', 'FM', 'AM', 'DIGITAL', 'PACKET', 'WINLINK', 'OTHER'];
 
 function elapsedLabel(openedAt: string | null): string {
@@ -577,8 +604,8 @@ function NetStatusBar({
     net.status === 'open'
       ? 'bg-green-500'
       : net.status === 'draft'
-      ? 'bg-yellow-400'
-      : 'bg-gray-400';
+        ? 'bg-yellow-400'
+        : 'bg-gray-400';
 
   return (
     <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-start justify-between">
@@ -729,9 +756,14 @@ function CheckInEditPanel({
   const handleLatLonBlur = () => {
     const latNum = parseFloat(lat);
     const lonNum = parseFloat(lon);
-    if (!isNaN(latNum) && !isNaN(lonNum) &&
-        latNum >= -90 && latNum <= 90 &&
-        lonNum >= -180 && lonNum <= 180) {
+    if (
+      !isNaN(latNum) &&
+      !isNaN(lonNum) &&
+      latNum >= -90 &&
+      latNum <= 90 &&
+      lonNum >= -180 &&
+      lonNum <= 180
+    ) {
       setGrid(latLonToGrid(latNum, lonNum));
     }
   };
@@ -767,7 +799,9 @@ function CheckInEditPanel({
         <span className="text-xs font-semibold text-indigo-800">
           Location — {checkIn.operatorCallsign}
         </span>
-        <button onClick={onClose} className="text-xs text-gray-400 hover:text-gray-600">✕</button>
+        <button onClick={onClose} className="text-xs text-gray-400 hover:text-gray-600">
+          ✕
+        </button>
       </div>
       {error && <p className="text-xs text-red-600 mb-2">{error}</p>}
       <div className="grid grid-cols-2 gap-2 mb-2">
@@ -925,7 +959,9 @@ function CheckInEntryForm({
             ref={callsignRef}
             value={isNetControl ? enteredCallsign : callsign}
             readOnly={!isNetControl}
-            onChange={isNetControl ? (e) => setEnteredCallsign(e.target.value.toUpperCase()) : undefined}
+            onChange={
+              isNetControl ? (e) => setEnteredCallsign(e.target.value.toUpperCase()) : undefined
+            }
             onKeyDown={handleKeyDown}
             className={`w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 ${isNetControl ? '' : 'bg-gray-50'}`}
           />
@@ -972,7 +1008,9 @@ function CheckInEntryForm({
           >
             <option value="">—</option>
             {CHECKIN_ROLES.map((r) => (
-              <option key={r} value={r}>{r}</option>
+              <option key={r} value={r}>
+                {r}
+              </option>
             ))}
           </select>
         </div>
@@ -988,7 +1026,9 @@ function CheckInEntryForm({
           >
             <option value="">—</option>
             {CHECKIN_MODES.map((m) => (
-              <option key={m} value={m}>{m}</option>
+              <option key={m} value={m}>
+                {m}
+              </option>
             ))}
           </select>
         </div>
@@ -1074,9 +1114,7 @@ export function NetSessionPage() {
   );
 
   const isNetControl =
-    !!net &&
-    !!callsign &&
-    net.netControl.toUpperCase() === callsign.toUpperCase();
+    !!net && !!callsign && net.netControl.toUpperCase() === callsign.toUpperCase();
 
   if (netQuery.isError) {
     return (
@@ -1091,9 +1129,7 @@ export function NetSessionPage() {
 
   if (!net) {
     return (
-      <div className="flex items-center justify-center h-full text-sm text-gray-400">
-        Loading…
-      </div>
+      <div className="flex items-center justify-center h-full text-sm text-gray-400">Loading…</div>
     );
   }
 
@@ -1144,7 +1180,7 @@ export function NetSessionPage() {
                       canRemove={isNetControl && net.status === 'open'}
                       canEdit={isNetControl}
                       onRemove={() => removeCheckIn.mutate(ci.id)}
-                      onEdit={() => setEditingCheckInId((prev) => prev === ci.id ? null : ci.id)}
+                      onEdit={() => setEditingCheckInId((prev) => (prev === ci.id ? null : ci.id))}
                     />
                     {editingCheckInId === ci.id && (
                       <CheckInEditPanel
@@ -1177,7 +1213,9 @@ export function NetSessionPage() {
               netOpen={net.status === 'open'}
               callsign={callsign ?? ''}
               isNetControl={isNetControl}
-              onCheckedIn={() => void queryClient.invalidateQueries({ queryKey: ['check-ins', id] })}
+              onCheckedIn={() =>
+                void queryClient.invalidateQueries({ queryKey: ['check-ins', id] })
+              }
             />
           </div>
         </div>

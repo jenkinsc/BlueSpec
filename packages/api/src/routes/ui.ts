@@ -1,43 +1,108 @@
 import { Hono } from 'hono';
 import { html } from 'hono/html';
 
-const layout = (title: string, body: string) => html`<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${title} — EmComm</title>
-  <style>
-    * { box-sizing: border-box; }
-    body { font-family: system-ui, sans-serif; max-width: 480px; margin: 60px auto; padding: 0 16px; color: #1a1a1a; }
-    h1 { font-size: 1.5rem; margin-bottom: 24px; }
-    nav { margin-bottom: 32px; font-size: 0.9rem; }
-    nav a { margin-right: 16px; color: #0066cc; text-decoration: none; }
-    label { display: block; margin-bottom: 4px; font-size: 0.875rem; font-weight: 600; }
-    input { width: 100%; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 16px; font-size: 1rem; }
-    button { padding: 10px 20px; background: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; }
-    button:hover { background: #0052a3; }
-    .error { color: #cc0000; font-size: 0.875rem; margin-bottom: 12px; }
-    .card { border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
-    .badge-active { background: #dcfce7; color: #166534; }
-    .badge-open { background: #fef9c3; color: #713f12; }
-  </style>
-</head>
-<body>
-  <nav>
-    <a href="/">Dashboard</a>
-    <a href="/ui/login">Login</a>
-    <a href="/ui/register">Register</a>
-  </nav>
-  ${body}
-</body>
-</html>`;
+const layout = (title: string, body: string) =>
+  html`<!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>${title} — EmComm</title>
+        <style>
+          * {
+            box-sizing: border-box;
+          }
+          body {
+            font-family: system-ui, sans-serif;
+            max-width: 480px;
+            margin: 60px auto;
+            padding: 0 16px;
+            color: #1a1a1a;
+          }
+          h1 {
+            font-size: 1.5rem;
+            margin-bottom: 24px;
+          }
+          nav {
+            margin-bottom: 32px;
+            font-size: 0.9rem;
+          }
+          nav a {
+            margin-right: 16px;
+            color: #0066cc;
+            text-decoration: none;
+          }
+          label {
+            display: block;
+            margin-bottom: 4px;
+            font-size: 0.875rem;
+            font-weight: 600;
+          }
+          input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin-bottom: 16px;
+            font-size: 1rem;
+          }
+          button {
+            padding: 10px 20px;
+            background: #0066cc;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+          }
+          button:hover {
+            background: #0052a3;
+          }
+          .error {
+            color: #cc0000;
+            font-size: 0.875rem;
+            margin-bottom: 12px;
+          }
+          .card {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+          }
+          .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+          }
+          .badge-active {
+            background: #dcfce7;
+            color: #166534;
+          }
+          .badge-open {
+            background: #fef9c3;
+            color: #713f12;
+          }
+        </style>
+      </head>
+      <body>
+        <nav>
+          <a href="/">Dashboard</a>
+          <a href="/ui/login">Login</a>
+          <a href="/ui/register">Register</a>
+        </nav>
+        ${body}
+      </body>
+    </html>`;
 
 export const uiRouter = new Hono()
   // Login page
   .get('/login', (c) =>
-    c.html(layout('Login', `
+    c.html(
+      layout(
+        'Login',
+        `
       <h1>Login</h1>
       <form id="login-form">
         <label for="callsign">Callsign</label>
@@ -68,12 +133,17 @@ export const uiRouter = new Hono()
           window.location.href = '/';
         });
       </script>
-    `)),
+    `,
+      ),
+    ),
   )
 
   // Register page
   .get('/register', (c) =>
-    c.html(layout('Register', `
+    c.html(
+      layout(
+        'Register',
+        `
       <h1>Register</h1>
       <form id="register-form">
         <label for="callsign">Callsign</label>
@@ -120,12 +190,17 @@ export const uiRouter = new Hono()
           window.location.href = '/';
         });
       </script>
-    `)),
+    `,
+      ),
+    ),
   );
 
 // Root dashboard — requires login client-side
 export const dashboardRoute = new Hono().get('/', (c) =>
-  c.html(layout('Dashboard', `
+  c.html(
+    layout(
+      'Dashboard',
+      `
     <h1>EmComm Dashboard</h1>
     <div id="guest" style="display:none">
       <p>Welcome. <a href="/ui/login">Login</a> or <a href="/ui/register">Register</a> to continue.</p>
@@ -170,5 +245,7 @@ export const dashboardRoute = new Hono().get('/', (c) =>
         window.location.href = '/ui/login';
       }
     </script>
-  `)),
+  `,
+    ),
+  ),
 );

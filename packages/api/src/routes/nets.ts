@@ -12,7 +12,15 @@ import { tryGetOrgId } from '../middleware/org.js';
 const MODE_ENUM = ['FM', 'SSB', 'CW', 'DMR', 'D-STAR', 'FT8', 'other'] as const;
 const STATUS_ENUM = ['draft', 'open', 'closed'] as const;
 const TRAFFIC_TYPE_ENUM = ['routine', 'welfare', 'priority', 'emergency'] as const;
-const CHECKIN_ROLE_ENUM = ['NET_CONTROL', 'RELAY', 'MOBILE', 'PORTABLE', 'FIXED', 'EOC', 'EMCOMM'] as const;
+const CHECKIN_ROLE_ENUM = [
+  'NET_CONTROL',
+  'RELAY',
+  'MOBILE',
+  'PORTABLE',
+  'FIXED',
+  'EOC',
+  'EMCOMM',
+] as const;
 const CHECKIN_MODE_ENUM = ['SSB', 'FM', 'AM', 'DIGITAL', 'PACKET', 'WINLINK', 'OTHER'] as const;
 
 // Frequency validated as a decimal string e.g. "146.520"
@@ -120,15 +128,16 @@ export const netsRouter = new Hono()
         .leftJoin(checkIns, eq(checkIns.netId, nets.id))
         .groupBy(nets.id);
       const rows =
-        conditions.length > 0
-          ? await baseQuery.where(and(...conditions))
-          : await baseQuery;
+        conditions.length > 0 ? await baseQuery.where(and(...conditions)) : await baseQuery;
       return c.json(rows);
     }
 
     const rows =
       conditions.length > 0
-        ? await db.select().from(nets).where(and(...conditions))
+        ? await db
+            .select()
+            .from(nets)
+            .where(and(...conditions))
         : await db.select().from(nets);
     return c.json(rows);
   })
@@ -142,11 +151,7 @@ export const netsRouter = new Hono()
     if (orgResult instanceof Response) return orgResult;
     const orgId = orgResult;
 
-    const [row] = await db
-      .select()
-      .from(nets)
-      .where(eq(nets.id, id))
-      .limit(1);
+    const [row] = await db.select().from(nets).where(eq(nets.id, id)).limit(1);
     if (!row) return c.json({ error: 'Not found' }, 404);
 
     if (orgId && row.organizationId !== orgId) {
@@ -161,7 +166,6 @@ export const netsRouter = new Hono()
   .post('/', requireAuth, zValidator('json', CreateNetSchema), async (c) => {
     const body = c.req.valid('json');
     const callsign = c.get('callsign') as string;
-    const operatorId = c.get('operatorId') as string;
 
     const orgResult = await tryGetOrgId(c);
     if (orgResult instanceof Response) return orgResult;
@@ -214,11 +218,7 @@ export const netsRouter = new Hono()
     if (body.mode !== undefined) updates.mode = body.mode;
     if (body.schedule !== undefined) updates.schedule = body.schedule;
 
-    const [updated] = await db
-      .update(nets)
-      .set(updates)
-      .where(eq(nets.id, id))
-      .returning();
+    const [updated] = await db.update(nets).set(updates).where(eq(nets.id, id)).returning();
     return c.json(updated);
   })
 
@@ -251,7 +251,12 @@ export const netsRouter = new Hono()
       .set({ status: 'open', netControlId: operatorId, openedAt: now, updatedAt: now })
       .where(eq(nets.id, id))
       .returning();
-    await appendNetEvent(id, 'net_open', operatorId, `Net opened by ${c.get('callsign') as string}`);
+    await appendNetEvent(
+      id,
+      'net_open',
+      operatorId,
+      `Net opened by ${c.get('callsign') as string}`,
+    );
     return c.json(updated);
   })
 
@@ -272,10 +277,7 @@ export const netsRouter = new Hono()
     }
 
     if (row.status !== 'open') {
-      return c.json(
-        { error: `Conflict: net is ${row.status}; can only close an open net` },
-        409,
-      );
+      return c.json({ error: `Conflict: net is ${row.status}; can only close an open net` }, 409);
     }
 
     if (row.netControlId !== operatorId) {
@@ -288,7 +290,12 @@ export const netsRouter = new Hono()
       .set({ status: 'closed', closedAt: now, updatedAt: now })
       .where(eq(nets.id, id))
       .returning();
-    await appendNetEvent(id, 'net_close', operatorId, `Net closed by ${c.get('callsign') as string}`);
+    await appendNetEvent(
+      id,
+      'net_close',
+      operatorId,
+      `Net closed by ${c.get('callsign') as string}`,
+    );
     return c.json(updated);
   })
 
@@ -389,93 +396,117 @@ export const netsRouter = new Hono()
   })
 
   // PATCH /nets/:netId/check-ins/:id — update check-in (auth required, net control only)
-  .patch('/:netId/check-ins/:id', requireAuth, zValidator('json', UpdateCheckInSchema), async (c) => {
-    const netId = c.req.param('netId') as string;
-    const checkInId = c.req.param('id') as string;
-    const operatorId = c.get('operatorId') as string;
-    const body = c.req.valid('json');
+  .patch(
+    '/:netId/check-ins/:id',
+    requireAuth,
+    zValidator('json', UpdateCheckInSchema),
+    async (c) => {
+      const netId = c.req.param('netId') as string;
+      const checkInId = c.req.param('id') as string;
+      const operatorId = c.get('operatorId') as string;
+      const body = c.req.valid('json');
 
-    const orgResult = await tryGetOrgId(c);
-    if (orgResult instanceof Response) return orgResult;
-    const orgId = orgResult;
+      const orgResult = await tryGetOrgId(c);
+      if (orgResult instanceof Response) return orgResult;
+      const orgId = orgResult;
 
-    // Verify net exists
-    const [net] = await db.select().from(nets).where(eq(nets.id, netId)).limit(1);
-    if (!net) return c.json({ error: 'Net not found' }, 404);
+      // Verify net exists
+      const [net] = await db.select().from(nets).where(eq(nets.id, netId)).limit(1);
+      if (!net) return c.json({ error: 'Net not found' }, 404);
 
-    if (orgId && net.organizationId !== orgId) {
-      return c.json({ error: 'Net not found' }, 404);
-    }
+      if (orgId && net.organizationId !== orgId) {
+        return c.json({ error: 'Net not found' }, 404);
+      }
 
-    // Only net control may update check-ins
-    if (net.netControlId !== operatorId) {
-      return c.json({ error: 'Forbidden: only the net control operator may update check-ins' }, 403);
-    }
+      // Only net control may update check-ins
+      if (net.netControlId !== operatorId) {
+        return c.json(
+          { error: 'Forbidden: only the net control operator may update check-ins' },
+          403,
+        );
+      }
 
-    const [checkIn] = await db
-      .select()
-      .from(checkIns)
-      .where(and(eq(checkIns.id, checkInId), eq(checkIns.netId, netId)))
-      .limit(1);
-    if (!checkIn) return c.json({ error: 'Check-in not found' }, 404);
+      const [checkIn] = await db
+        .select()
+        .from(checkIns)
+        .where(and(eq(checkIns.id, checkInId), eq(checkIns.netId, netId)))
+        .limit(1);
+      if (!checkIn) return c.json({ error: 'Check-in not found' }, 404);
 
-    const now = new Date().toISOString();
-    const updates: Record<string, unknown> = { updatedAt: now };
-    if (body.signal_report !== undefined) updates.signalReport = body.signal_report;
-    if (body.traffic_type !== undefined) updates.trafficType = body.traffic_type;
-    if (body.role !== undefined) updates.role = body.role;
-    if (body.mode !== undefined) updates.mode = body.mode;
-    if (body.remarks !== undefined) updates.remarks = body.remarks;
-    if (body.acknowledged_at !== undefined) updates.acknowledgedAt = body.acknowledged_at;
-    // Location fields (BLUAAA-76)
-    if (body.grid_square !== undefined) updates.gridSquare = body.grid_square;
-    if (body.latitude !== undefined) updates.latitude = body.latitude;
-    if (body.longitude !== undefined) updates.longitude = body.longitude;
-    if (body.county !== undefined) updates.county = body.county;
-    if (body.city !== undefined) updates.city = body.city;
-    if (body.state !== undefined) updates.state = body.state;
+      const now = new Date().toISOString();
+      const updates: Record<string, unknown> = { updatedAt: now };
+      if (body.signal_report !== undefined) updates.signalReport = body.signal_report;
+      if (body.traffic_type !== undefined) updates.trafficType = body.traffic_type;
+      if (body.role !== undefined) updates.role = body.role;
+      if (body.mode !== undefined) updates.mode = body.mode;
+      if (body.remarks !== undefined) updates.remarks = body.remarks;
+      if (body.acknowledged_at !== undefined) updates.acknowledgedAt = body.acknowledged_at;
+      // Location fields (BLUAAA-76)
+      if (body.grid_square !== undefined) updates.gridSquare = body.grid_square;
+      if (body.latitude !== undefined) updates.latitude = body.latitude;
+      if (body.longitude !== undefined) updates.longitude = body.longitude;
+      if (body.county !== undefined) updates.county = body.county;
+      if (body.city !== undefined) updates.city = body.city;
+      if (body.state !== undefined) updates.state = body.state;
 
-    const [updated] = await db
-      .update(checkIns)
-      .set(updates)
-      .where(eq(checkIns.id, checkInId))
-      .returning();
+      const [updated] = await db
+        .update(checkIns)
+        .set(updates)
+        .where(eq(checkIns.id, checkInId))
+        .returning();
 
-    // Append granular timeline events for each changed field
-    if (body.role !== undefined && body.role !== checkIn.role) {
-      await appendNetEvent(netId, 'role_change', operatorId,
-        `${checkIn.operatorCallsign} role changed to ${body.role}`);
-    }
-    if (body.mode !== undefined && body.mode !== checkIn.mode) {
-      await appendNetEvent(netId, 'mode_change', operatorId,
-        `${checkIn.operatorCallsign} mode changed to ${body.mode}`);
-    }
-    if (body.traffic_type !== undefined && body.traffic_type !== checkIn.trafficType) {
-      await appendNetEvent(netId, 'status_change', operatorId,
-        `${checkIn.operatorCallsign} traffic type changed to ${body.traffic_type}`);
-    }
-    // Emit location_change event if any location field changed
-    const locationChanged =
-      (body.grid_square !== undefined && body.grid_square !== checkIn.gridSquare) ||
-      (body.latitude !== undefined && body.latitude !== checkIn.latitude) ||
-      (body.longitude !== undefined && body.longitude !== checkIn.longitude) ||
-      (body.county !== undefined && body.county !== checkIn.county) ||
-      (body.city !== undefined && body.city !== checkIn.city) ||
-      (body.state !== undefined && body.state !== checkIn.state);
-    if (locationChanged) {
-      const locParts: string[] = [];
-      const gs = body.grid_square ?? checkIn.gridSquare;
-      const city = body.city ?? checkIn.city;
-      const st = body.state ?? checkIn.state;
-      if (gs) locParts.push(gs);
-      if (city) locParts.push(city);
-      if (st) locParts.push(st);
-      await appendNetEvent(netId, 'location_change', operatorId,
-        `${checkIn.operatorCallsign} location updated${locParts.length ? `: ${locParts.join(', ')}` : ''}`);
-    }
+      // Append granular timeline events for each changed field
+      if (body.role !== undefined && body.role !== checkIn.role) {
+        await appendNetEvent(
+          netId,
+          'role_change',
+          operatorId,
+          `${checkIn.operatorCallsign} role changed to ${body.role}`,
+        );
+      }
+      if (body.mode !== undefined && body.mode !== checkIn.mode) {
+        await appendNetEvent(
+          netId,
+          'mode_change',
+          operatorId,
+          `${checkIn.operatorCallsign} mode changed to ${body.mode}`,
+        );
+      }
+      if (body.traffic_type !== undefined && body.traffic_type !== checkIn.trafficType) {
+        await appendNetEvent(
+          netId,
+          'status_change',
+          operatorId,
+          `${checkIn.operatorCallsign} traffic type changed to ${body.traffic_type}`,
+        );
+      }
+      // Emit location_change event if any location field changed
+      const locationChanged =
+        (body.grid_square !== undefined && body.grid_square !== checkIn.gridSquare) ||
+        (body.latitude !== undefined && body.latitude !== checkIn.latitude) ||
+        (body.longitude !== undefined && body.longitude !== checkIn.longitude) ||
+        (body.county !== undefined && body.county !== checkIn.county) ||
+        (body.city !== undefined && body.city !== checkIn.city) ||
+        (body.state !== undefined && body.state !== checkIn.state);
+      if (locationChanged) {
+        const locParts: string[] = [];
+        const gs = body.grid_square ?? checkIn.gridSquare;
+        const city = body.city ?? checkIn.city;
+        const st = body.state ?? checkIn.state;
+        if (gs) locParts.push(gs);
+        if (city) locParts.push(city);
+        if (st) locParts.push(st);
+        await appendNetEvent(
+          netId,
+          'location_change',
+          operatorId,
+          `${checkIn.operatorCallsign} location updated${locParts.length ? `: ${locParts.join(', ')}` : ''}`,
+        );
+      }
 
-    return c.json(updated);
-  })
+      return c.json(updated);
+    },
+  )
 
   // DELETE /nets/:netId/check-ins/:id — remove a check-in (auth required, net control only)
   .delete('/:netId/check-ins/:id', requireAuth, async (c) => {
@@ -497,7 +528,10 @@ export const netsRouter = new Hono()
 
     // Only net control may remove check-ins
     if (net.netControlId !== operatorId) {
-      return c.json({ error: 'Forbidden: only the net control operator may remove check-ins' }, 403);
+      return c.json(
+        { error: 'Forbidden: only the net control operator may remove check-ins' },
+        403,
+      );
     }
 
     const [deleted] = await db
@@ -505,8 +539,12 @@ export const netsRouter = new Hono()
       .where(and(eq(checkIns.id, checkInId), eq(checkIns.netId, netId)))
       .returning();
     if (!deleted) return c.json({ error: 'Check-in not found' }, 404);
-    await appendNetEvent(netId, 'check_out', operatorId,
-      `${deleted.operatorCallsign} removed from net`);
+    await appendNetEvent(
+      netId,
+      'check_out',
+      operatorId,
+      `${deleted.operatorCallsign} removed from net`,
+    );
     return c.body(null, 204);
   })
 

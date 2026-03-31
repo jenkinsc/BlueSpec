@@ -25,11 +25,7 @@ export const operatorsRouter = new Hono()
   // Get one operator by callsign or id
   .get('/:id', async (c) => {
     const id = c.req.param('id');
-    const [row] = await db
-      .select()
-      .from(operators)
-      .where(eq(operators.id, id))
-      .limit(1);
+    const [row] = await db.select().from(operators).where(eq(operators.id, id)).limit(1);
     if (!row) return c.json({ error: 'Not found' }, 404);
     const { passwordHash: _, ...op } = row;
     return c.json(op);
@@ -65,10 +61,7 @@ export const operatorsRouter = new Hono()
   // Delete operator
   .delete('/:id', async (c) => {
     const id = c.req.param('id');
-    const [deleted] = await db
-      .delete(operators)
-      .where(eq(operators.id, id))
-      .returning();
+    const [deleted] = await db.delete(operators).where(eq(operators.id, id)).returning();
     if (!deleted) return c.json({ error: 'Not found' }, 404);
     return c.body(null, 204);
   });

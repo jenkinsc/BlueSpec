@@ -10,9 +10,7 @@ const MODES = ['FM', 'SSB', 'CW', 'DMR', 'D-STAR', 'FT8', 'other'] as const;
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required'),
-  frequency: z
-    .string()
-    .regex(/^\d+(\.\d+)?$/, 'Enter a decimal frequency, e.g. 146.520'),
+  frequency: z.string().regex(/^\d+(\.\d+)?$/, 'Enter a decimal frequency, e.g. 146.520'),
   mode: z.enum(MODES).default('FM'),
   region: z.string().optional(),
   notes: z.string().optional(),
@@ -58,7 +56,7 @@ export function TemplateFormPage() {
       reset({
         name: t.name,
         frequency: t.frequency,
-        mode: t.mode as typeof MODES[number],
+        mode: t.mode as (typeof MODES)[number],
         region: t.region ?? '',
         notes: t.notes ?? '',
       });
@@ -91,9 +89,7 @@ export function TemplateFormPage() {
 
   if (isEdit && existingQuery.isLoading) {
     return (
-      <div className="flex items-center justify-center h-full text-sm text-gray-400">
-        Loading…
-      </div>
+      <div className="flex items-center justify-center h-full text-sm text-gray-400">Loading…</div>
     );
   }
 

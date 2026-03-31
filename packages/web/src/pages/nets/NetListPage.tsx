@@ -32,8 +32,7 @@ const TABS: { key: Tab; label: string }[] = [
 function useNets(status: Tab) {
   return useQuery<NetRow[]>({
     queryKey: ['nets', status],
-    queryFn: () =>
-      apiFetch<NetRow[]>(`/api/nets?status=${status}&includeCounts=true`),
+    queryFn: () => apiFetch<NetRow[]>(`/api/nets?status=${status}&includeCounts=true`),
     refetchOnWindowFocus: true,
     staleTime: 15_000,
   });
@@ -60,11 +59,7 @@ function formatClosedDate(closedAt: string | null): string {
 
 function StatusDot({ status }: { status: NetStatus }) {
   const color =
-    status === 'open'
-      ? 'bg-green-500'
-      : status === 'draft'
-        ? 'bg-yellow-400'
-        : 'bg-gray-400';
+    status === 'open' ? 'bg-green-500' : status === 'draft' ? 'bg-yellow-400' : 'bg-gray-400';
   return <span className={`inline-block w-2 h-2 rounded-full ${color}`} />;
 }
 
@@ -73,21 +68,19 @@ interface NetRowItemProps {
   onOpen: (id: string) => void;
 }
 
-function NetRowItem({ net, onOpen }: NetRowItemProps) {
+function NetRowItem({ net, onOpen: _onOpen }: NetRowItemProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [openError, setOpenError] = useState<string | null>(null);
 
   const openMutation = useMutation({
-    mutationFn: () =>
-      apiFetch<NetRow>(`/api/nets/${net.id}/open`, { method: 'POST' }),
+    mutationFn: () => apiFetch<NetRow>(`/api/nets/${net.id}/open`, { method: 'POST' }),
     onSuccess: () => {
       setOpenError(null);
       void queryClient.invalidateQueries({ queryKey: ['nets'] });
     },
     onError: (err: unknown) => {
-      const message =
-        err instanceof Error ? err.message : 'Failed to open net. Please try again.';
+      const message = err instanceof Error ? err.message : 'Failed to open net. Please try again.';
       setOpenError(message);
     },
   });
@@ -106,9 +99,7 @@ function NetRowItem({ net, onOpen }: NetRowItemProps) {
         >
           {openMutation.isPending ? 'Opening…' : 'Open Net'}
         </button>
-        {openError && (
-          <p className="text-xs text-red-600 max-w-[160px] text-right">{openError}</p>
-        )}
+        {openError && <p className="text-xs text-red-600 max-w-[160px] text-right">{openError}</p>}
       </div>
     );
   } else if (net.status === 'open') {
@@ -185,19 +176,11 @@ function TabPanel({ tab, onOpen }: { tab: Tab; onOpen: (id: string) => void }) {
   const { data, isLoading, isError } = useNets(tab);
 
   if (isLoading) {
-    return (
-      <div className="px-4 py-8 text-center text-sm text-gray-400">
-        Loading…
-      </div>
-    );
+    return <div className="px-4 py-8 text-center text-sm text-gray-400">Loading…</div>;
   }
 
   if (isError) {
-    return (
-      <div className="px-4 py-8 text-center text-sm text-red-500">
-        Failed to load nets.
-      </div>
-    );
+    return <div className="px-4 py-8 text-center text-sm text-red-500">Failed to load nets.</div>;
   }
 
   if (!data || data.length === 0) {
@@ -267,10 +250,7 @@ export function NetListPage() {
 
       {/* Create modal */}
       {showCreate && (
-        <CreateNetModal
-          onClose={() => setShowCreate(false)}
-          onCreated={handleCreated}
-        />
+        <CreateNetModal onClose={() => setShowCreate(false)} onCreated={handleCreated} />
       )}
     </div>
   );

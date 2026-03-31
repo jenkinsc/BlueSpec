@@ -107,11 +107,7 @@ export const templatesRouter = new Hono()
     if (orgResult instanceof Response) return orgResult;
     const orgId = orgResult;
 
-    const [row] = await db
-      .select()
-      .from(netTemplates)
-      .where(eq(netTemplates.id, id))
-      .limit(1);
+    const [row] = await db.select().from(netTemplates).where(eq(netTemplates.id, id)).limit(1);
     if (!row) return c.json({ error: 'Not found' }, 404);
 
     if (orgId && row.organizationId !== orgId) {
@@ -145,11 +141,7 @@ export const templatesRouter = new Hono()
     if (orgResult instanceof Response) return orgResult;
     const orgId = orgResult;
 
-    const [row] = await db
-      .select()
-      .from(netTemplates)
-      .where(eq(netTemplates.id, id))
-      .limit(1);
+    const [row] = await db.select().from(netTemplates).where(eq(netTemplates.id, id)).limit(1);
     if (!row) return c.json({ error: 'Not found' }, 404);
 
     if (orgId && row.organizationId !== orgId) {

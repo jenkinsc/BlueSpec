@@ -57,20 +57,10 @@ export const organizationsRouter = new Hono()
     if (memberships.length === 0) return c.json([]);
 
     const orgIds = memberships.map((m) => m.organizationId);
-    const rows = await db
-      .select()
-      .from(organizations)
-      .where(
-        orgIds.length === 1
-          ? eq(organizations.id, orgIds[0])
-          : eq(organizations.id, orgIds[0]), // fallback; loop below for multiple
-      );
 
     // For multiple orgs, fetch all
     const allOrgs = await Promise.all(
-      orgIds.map((id) =>
-        db.select().from(organizations).where(eq(organizations.id, id)).limit(1),
-      ),
+      orgIds.map((id) => db.select().from(organizations).where(eq(organizations.id, id)).limit(1)),
     );
     return c.json(allOrgs.flat());
   })
@@ -80,11 +70,7 @@ export const organizationsRouter = new Hono()
     const id = c.req.param('id') as string;
     const operatorId = c.get('operatorId');
 
-    const [org] = await db
-      .select()
-      .from(organizations)
-      .where(eq(organizations.id, id))
-      .limit(1);
+    const [org] = await db.select().from(organizations).where(eq(organizations.id, id)).limit(1);
     if (!org) return c.json({ error: 'Not found' }, 404);
 
     // Enforce that the caller is a member of the org
@@ -125,11 +111,7 @@ export const organizationsRouter = new Hono()
     const body = c.req.valid('json');
 
     // Verify org exists
-    const [org] = await db
-      .select()
-      .from(organizations)
-      .where(eq(organizations.id, orgId))
-      .limit(1);
+    const [org] = await db.select().from(organizations).where(eq(organizations.id, orgId)).limit(1);
     if (!org) return c.json({ error: 'Not found' }, 404);
 
     // Verify caller is admin
@@ -190,11 +172,7 @@ export const organizationsRouter = new Hono()
     const callerOpId = c.get('operatorId');
 
     // Verify org exists
-    const [org] = await db
-      .select()
-      .from(organizations)
-      .where(eq(organizations.id, orgId))
-      .limit(1);
+    const [org] = await db.select().from(organizations).where(eq(organizations.id, orgId)).limit(1);
     if (!org) return c.json({ error: 'Not found' }, 404);
 
     // Verify caller is admin

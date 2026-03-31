@@ -79,12 +79,8 @@
           "name": "check_ins_net_id_nets_id_fk",
           "tableFrom": "check_ins",
           "tableTo": "nets",
-          "columnsFrom": [
-            "net_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["net_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -261,12 +257,8 @@
           "name": "nets_incident_id_incidents_id_fk",
           "tableFrom": "nets",
           "tableTo": "incidents",
-          "columnsFrom": [
-            "incident_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["incident_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -337,9 +329,7 @@
       "indexes": {
         "operators_callsign_unique": {
           "name": "operators_callsign_unique",
-          "columns": [
-            "callsign"
-          ],
+          "columns": ["callsign"],
           "isUnique": true
         }
       },

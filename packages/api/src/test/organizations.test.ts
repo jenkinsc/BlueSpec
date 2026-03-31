@@ -12,7 +12,7 @@ let memberToken: string;
 let adminOpId: string;
 let memberOpId: string;
 let orgId: string;
-let membershipId: string;
+let _membershipId: string;
 
 beforeAll(async () => {
   const migrationsFolder = path.join(__dirname, '../../drizzle');
@@ -106,7 +106,7 @@ describe('POST /organizations/:id/members', () => {
     const body = (await res.json()) as { id: string; role: string; operatorId: string };
     expect(body.role).toBe('member');
     expect(body.operatorId).toBe(memberOpId);
-    membershipId = body.id;
+    _membershipId = body.id;
   });
 
   it('returns 409 on duplicate invite', async () => {
@@ -130,26 +130,26 @@ describe('POST /organizations/:id/members', () => {
 
 describe('DELETE /organizations/:id/members/:opId', () => {
   it('forbids non-admin from removing', async () => {
-    const res = await client.request(
-      `/organizations/${orgId}/members/${adminOpId}`,
-      { method: 'DELETE', headers: authHeaders(memberToken) },
-    );
+    const res = await client.request(`/organizations/${orgId}/members/${adminOpId}`, {
+      method: 'DELETE',
+      headers: authHeaders(memberToken),
+    });
     expect(res.status).toBe(403);
   });
 
   it('admin can remove a member', async () => {
-    const res = await client.request(
-      `/organizations/${orgId}/members/${memberOpId}`,
-      { method: 'DELETE', headers: authHeaders(adminToken) },
-    );
+    const res = await client.request(`/organizations/${orgId}/members/${memberOpId}`, {
+      method: 'DELETE',
+      headers: authHeaders(adminToken),
+    });
     expect(res.status).toBe(204);
   });
 
   it('returns 404 after removal', async () => {
-    const res = await client.request(
-      `/organizations/${orgId}/members/${memberOpId}`,
-      { method: 'DELETE', headers: authHeaders(adminToken) },
-    );
+    const res = await client.request(`/organizations/${orgId}/members/${memberOpId}`, {
+      method: 'DELETE',
+      headers: authHeaders(adminToken),
+    });
     expect(res.status).toBe(404);
   });
 });

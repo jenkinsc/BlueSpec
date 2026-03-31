@@ -247,7 +247,7 @@ describe('Auth — JWT middleware', () => {
     expect(noToken.status).toBe(401);
 
     // J-2: Expired token (a valid-structure but expired JWT)
-    const { signToken } = await import('../lib/jwt.js');
+    const { signToken: _signToken } = await import('../lib/jwt.js');
     // We can't easily craft an expired token without time manipulation,
     // so we use a clearly malformed one instead.
     const malformed = await testApp.request('/protected', {
@@ -265,7 +265,9 @@ describe('Auth — JWT middleware', () => {
 
     // J-5: alg:none attack — header={"alg":"none"}, no signature
     const header = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url');
-    const payload = Buffer.from(JSON.stringify({ sub: 'fake', callsign: 'EVIL' })).toString('base64url');
+    const payload = Buffer.from(JSON.stringify({ sub: 'fake', callsign: 'EVIL' })).toString(
+      'base64url',
+    );
     const algNoneToken = `${header}.${payload}.`;
     const algNoneRes = await testApp.request('/protected', {
       headers: { Authorization: `Bearer ${algNoneToken}` },
@@ -287,7 +289,11 @@ describe('REST API — /operators CRUD', () => {
   const cs = uniqueCallsign();
 
   it('POST /operators → 201 with operator (no passwordHash)', async () => {
-    const res = await client.post('/operators', { callsign: cs, name: 'QA Op', licenseClass: 'general' });
+    const res = await client.post('/operators', {
+      callsign: cs,
+      name: 'QA Op',
+      licenseClass: 'general',
+    });
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.callsign).toBe(cs);
@@ -606,7 +612,11 @@ describe('M2 — Incident activities', () => {
     const res = await client.request('/incidents', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${actAuthToken}` },
-      body: JSON.stringify({ title: 'Activity Test Incident', incident_type: 'search_rescue', activation_level: 1 }),
+      body: JSON.stringify({
+        title: 'Activity Test Incident',
+        incident_type: 'search_rescue',
+        activation_level: 1,
+      }),
     });
     actIncidentId = (await res.json()).id;
   });

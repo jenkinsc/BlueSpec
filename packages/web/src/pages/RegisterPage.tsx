@@ -5,7 +5,10 @@ import { useAuth } from '../lib/auth.tsx';
 import { useNavigate, Link } from 'react-router-dom';
 
 const schema = z.object({
-  callsign: z.string().min(3, 'Callsign must be at least 3 characters').max(10, 'Callsign too long'),
+  callsign: z
+    .string()
+    .min(3, 'Callsign must be at least 3 characters')
+    .max(10, 'Callsign too long'),
   name: z.string().min(1, 'Enter your name'),
   email: z.string().email('Enter a valid email').or(z.literal('')).optional(),
   password: z.string().min(8, 'Password must be at least 8 characters'),
@@ -38,17 +41,13 @@ export function RegisterPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-sm">
-        <h1 className="text-2xl font-bold text-center text-gray-900 mb-8">
-          Create Account
-        </h1>
+        <h1 className="text-2xl font-bold text-center text-gray-900 mb-8">Create Account</h1>
         <form
           onSubmit={handleSubmit(onSubmit)}
           className="bg-white shadow rounded-lg p-6 space-y-4"
         >
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Callsign
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Callsign</label>
             <input
               {...register('callsign')}
               autoCapitalize="characters"
@@ -61,18 +60,14 @@ export function RegisterPage() {
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Name
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
             <input
               {...register('name')}
               autoComplete="name"
               className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               placeholder="Jane Smith"
             />
-            {errors.name && (
-              <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>
-            )}
+            {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -85,14 +80,10 @@ export function RegisterPage() {
               className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               placeholder="jane@example.com"
             />
-            {errors.email && (
-              <p className="mt-1 text-xs text-red-600">{errors.email.message}</p>
-            )}
+            {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email.message}</p>}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Password
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
             <input
               {...register('password')}
               type="password"
@@ -103,9 +94,7 @@ export function RegisterPage() {
               <p className="mt-1 text-xs text-red-600">{errors.password.message}</p>
             )}
           </div>
-          {errors.root && (
-            <p className="text-sm text-red-600">{errors.root.message}</p>
-          )}
+          {errors.root && <p className="text-sm text-red-600">{errors.root.message}</p>}
           <button
             type="submit"
             disabled={isSubmitting}

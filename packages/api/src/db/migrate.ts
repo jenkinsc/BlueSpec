@@ -27,7 +27,7 @@ async function backfillMigrationRecords(): Promise<void> {
   `);
 
   const lastRow = await client.execute(
-    'SELECT created_at FROM __drizzle_migrations ORDER BY created_at DESC LIMIT 1'
+    'SELECT created_at FROM __drizzle_migrations ORDER BY created_at DESC LIMIT 1',
   );
   const lastTimestamp = Number(lastRow.rows[0]?.[0] ?? 0);
 

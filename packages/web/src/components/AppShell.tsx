@@ -11,8 +11,7 @@ const navItems = [
 ];
 
 function NavItem({ to, label, icon }: { to: string; label: string; icon: string }) {
-  const base =
-    'flex flex-col items-center gap-0.5 text-xs font-medium transition-colors';
+  const base = 'flex flex-col items-center gap-0.5 text-xs font-medium transition-colors';
   return (
     <NavLink
       to={to}
@@ -46,9 +45,7 @@ export function AppShell() {
                 end={item.to === '/'}
                 className={({ isActive }) =>
                   `text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'text-indigo-600'
-                      : 'text-gray-600 hover:text-gray-900'
+                    isActive ? 'text-indigo-600' : 'text-gray-600 hover:text-gray-900'
                   }`
                 }
               >
@@ -59,10 +56,7 @@ export function AppShell() {
         </div>
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-700 font-mono">{callsign}</span>
-          <button
-            onClick={logout}
-            className="text-sm text-gray-500 hover:text-gray-900"
-          >
+          <button onClick={logout} className="text-sm text-gray-500 hover:text-gray-900">
             Sign out
           </button>
         </div>

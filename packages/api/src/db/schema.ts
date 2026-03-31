@@ -83,8 +83,12 @@ export const checkIns = sqliteTable('check_ins', {
 // Incident activity log — append-only entries tracking real-time status
 export const incidentActivities = sqliteTable('incident_activities', {
   id: text('id').primaryKey(),
-  incidentId: text('incident_id').notNull().references(() => incidents.id),
-  operatorId: text('operator_id').notNull().references(() => operators.id),
+  incidentId: text('incident_id')
+    .notNull()
+    .references(() => incidents.id),
+  operatorId: text('operator_id')
+    .notNull()
+    .references(() => operators.id),
   note: text('note').notNull(),
   createdAt: text('created_at').notNull(),
 });
@@ -113,7 +117,9 @@ export const organizationMembers = sqliteTable('organization_members', {
 // Net templates — reusable net configuration presets
 export const netTemplates = sqliteTable('net_templates', {
   id: text('id').primaryKey(),
-  operatorId: text('operator_id').notNull().references(() => operators.id),
+  operatorId: text('operator_id')
+    .notNull()
+    .references(() => operators.id),
   organizationId: text('organization_id'), // FK to organizations(id); set when X-Org-Id header present (BLUAAA-37)
   name: text('name').notNull(),
   frequency: text('frequency').notNull(), // decimal string e.g. "146.520"
@@ -153,11 +159,13 @@ export const NET_EVENT_TYPES = [
   'net_close',
 ] as const;
 
-export type NetEventType = typeof NET_EVENT_TYPES[number];
+export type NetEventType = (typeof NET_EVENT_TYPES)[number];
 
 export const netEvents = sqliteTable('net_events', {
   id: text('id').primaryKey(),
-  netId: text('net_id').notNull().references(() => nets.id),
+  netId: text('net_id')
+    .notNull()
+    .references(() => nets.id),
   operatorId: text('operator_id'), // nullable — some events are system-generated
   eventType: text('event_type').notNull(), // NetEventType
   note: text('note'),

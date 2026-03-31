@@ -15,9 +15,7 @@ const MODES = ['FM', 'SSB', 'CW', 'DMR', 'D-STAR', 'FT8', 'other'] as const;
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required'),
-  frequency: z
-    .string()
-    .regex(/^\d+(\.\d+)?$/, 'Enter a decimal frequency, e.g. 146.520'),
+  frequency: z.string().regex(/^\d+(\.\d+)?$/, 'Enter a decimal frequency, e.g. 146.520'),
   mode: z.enum(MODES).default('FM'),
   schedule: z.string().optional(),
 });
@@ -67,7 +65,7 @@ export function CreateNetModal({ onClose, onCreated }: Props) {
     if (!tpl) return;
     setValue('name', tpl.name);
     setValue('frequency', tpl.frequency);
-    setValue('mode', tpl.mode as typeof MODES[number]);
+    setValue('mode', tpl.mode as (typeof MODES)[number]);
   };
 
   const mutation = useMutation({
@@ -115,8 +113,7 @@ export function CreateNetModal({ onClose, onCreated }: Props) {
           {templatesQuery.data && templatesQuery.data.length > 0 && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Load from template{' '}
-                <span className="text-gray-400 font-normal">(optional)</span>
+                Load from template <span className="text-gray-400 font-normal">(optional)</span>
               </label>
               <select
                 onChange={handleTemplateSelect}
@@ -137,17 +134,13 @@ export function CreateNetModal({ onClose, onCreated }: Props) {
 
           {/* Name */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Net Name
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Net Name</label>
             <input
               {...register('name')}
               className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               placeholder="Sunday Net"
             />
-            {errors.name && (
-              <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>
-            )}
+            {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>}
           </div>
 
           {/* Frequency + Mode row */}
@@ -163,16 +156,12 @@ export function CreateNetModal({ onClose, onCreated }: Props) {
                 inputMode="decimal"
               />
               {errors.frequency && (
-                <p className="mt-1 text-xs text-red-600">
-                  {errors.frequency.message}
-                </p>
+                <p className="mt-1 text-xs text-red-600">{errors.frequency.message}</p>
               )}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Mode
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Mode</label>
               <select
                 {...register('mode')}
                 className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -189,8 +178,7 @@ export function CreateNetModal({ onClose, onCreated }: Props) {
           {/* Schedule (optional) */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Schedule{' '}
-              <span className="text-gray-400 font-normal">(optional)</span>
+              Schedule <span className="text-gray-400 font-normal">(optional)</span>
             </label>
             <input
               {...register('schedule')}
@@ -199,9 +187,7 @@ export function CreateNetModal({ onClose, onCreated }: Props) {
             />
           </div>
 
-          {errors.root && (
-            <p className="text-sm text-red-600">{errors.root.message}</p>
-          )}
+          {errors.root && <p className="text-sm text-red-600">{errors.root.message}</p>}
 
           <div className="flex gap-3 pt-1">
             <button

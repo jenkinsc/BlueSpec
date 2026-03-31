@@ -87,12 +87,16 @@ function CreateIncidentModal({ onClose, onCreated }: CreateModalProps) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div className="w-full max-w-md bg-white rounded-t-2xl sm:rounded-xl shadow-xl p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">New Incident</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl">×</button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl">
+            ×
+          </button>
         </div>
         <div className="space-y-3">
           <div>
@@ -128,7 +132,9 @@ function CreateIncidentModal({ onClose, onCreated }: CreateModalProps) {
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Served Agency <span className="text-gray-400">(optional)</span></label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Served Agency <span className="text-gray-400">(optional)</span>
+            </label>
             <input
               value={agency}
               onChange={(e) => setAgency(e.target.value)}
@@ -137,7 +143,9 @@ function CreateIncidentModal({ onClose, onCreated }: CreateModalProps) {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Location <span className="text-gray-400">(optional)</span></label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Location <span className="text-gray-400">(optional)</span>
+            </label>
             <input
               value={location}
               onChange={(e) => setLocation(e.target.value)}
@@ -145,7 +153,9 @@ function CreateIncidentModal({ onClose, onCreated }: CreateModalProps) {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Description <span className="text-gray-400">(optional)</span></label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Description <span className="text-gray-400">(optional)</span>
+            </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -211,14 +221,14 @@ export function IncidentListPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {isLoading && (
-          <p className="text-sm text-gray-400 text-center py-8">Loading…</p>
-        )}
+        {isLoading && <p className="text-sm text-gray-400 text-center py-8">Loading…</p>}
         {isError && (
           <p className="text-sm text-red-500 text-center py-8">Failed to load incidents.</p>
         )}
         {!isLoading && !isError && (!data || data.length === 0) && (
-          <p className="text-sm text-gray-400 text-center py-12">No {tab !== 'all' ? tab : ''} incidents.</p>
+          <p className="text-sm text-gray-400 text-center py-12">
+            No {tab !== 'all' ? tab : ''} incidents.
+          </p>
         )}
         {data && data.length > 0 && (
           <ul className="divide-y divide-gray-100">

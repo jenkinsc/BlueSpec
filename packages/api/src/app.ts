@@ -39,7 +39,9 @@ export function createApp() {
   );
 
   // Global rate limit: 100 req/min per IP (override via RATE_LIMIT_GLOBAL env var for testing)
-  const globalRateMax = process.env.RATE_LIMIT_GLOBAL ? parseInt(process.env.RATE_LIMIT_GLOBAL, 10) : 100;
+  const globalRateMax = process.env.RATE_LIMIT_GLOBAL
+    ? parseInt(process.env.RATE_LIMIT_GLOBAL, 10)
+    : 100;
   app.use('*', rateLimit({ name: 'global', max: globalRateMax, windowMs: 60_000 }));
 
   app.use('*', requestLogger);
@@ -57,8 +59,9 @@ export function createApp() {
   });
   app.get('/openapi.json', (c) => c.json(openApiSpec));
 
-  // Auth (public) — tighter rate limit on login/register/demo
-  app.use('/auth/*', rateLimit({ name: 'auth', max: 10, windowMs: 60_000 }));
+  // Auth (public) — tighter rate limit on login/register/demo (override via RATE_LIMIT_AUTH for testing)
+  const authRateMax = process.env.RATE_LIMIT_AUTH ? parseInt(process.env.RATE_LIMIT_AUTH, 10) : 10;
+  app.use('/auth/*', rateLimit({ name: 'auth', max: authRateMax, windowMs: 60_000 }));
   app.route('/auth', authRouter);
 
   // Web UI

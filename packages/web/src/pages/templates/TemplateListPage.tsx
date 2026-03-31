@@ -14,13 +14,7 @@ interface Template {
   updatedAt: string;
 }
 
-function TemplateCard({
-  template,
-  onDelete,
-}: {
-  template: Template;
-  onDelete: () => void;
-}) {
+function TemplateCard({ template, onDelete }: { template: Template; onDelete: () => void }) {
   const navigate = useNavigate();
   const [confirming, setConfirming] = useState(false);
 
@@ -32,9 +26,7 @@ function TemplateCard({
           {template.frequency} MHz · {template.mode}
           {template.region ? ` · ${template.region}` : ''}
         </p>
-        {template.notes && (
-          <p className="text-xs text-gray-400 mt-1 truncate">{template.notes}</p>
-        )}
+        {template.notes && <p className="text-xs text-gray-400 mt-1 truncate">{template.notes}</p>}
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <button
@@ -46,7 +38,10 @@ function TemplateCard({
         {confirming ? (
           <>
             <button
-              onClick={() => { setConfirming(false); onDelete(); }}
+              onClick={() => {
+                setConfirming(false);
+                onDelete();
+              }}
               className="text-xs font-medium text-red-600 hover:text-red-800"
             >
               Delete
@@ -75,14 +70,17 @@ export function TemplateListPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const { data: templates, isLoading, isError } = useQuery<Template[]>({
+  const {
+    data: templates,
+    isLoading,
+    isError,
+  } = useQuery<Template[]>({
     queryKey: ['templates'],
     queryFn: () => apiFetch<Template[]>('/api/templates'),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) =>
-      apiFetch<void>(`/api/templates/${id}`, { method: 'DELETE' }),
+    mutationFn: (id: string) => apiFetch<void>(`/api/templates/${id}`, { method: 'DELETE' }),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['templates'] }),
   });
 
@@ -99,9 +97,7 @@ export function TemplateListPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pb-4">
-        {isLoading && (
-          <p className="text-sm text-gray-400 text-center py-8">Loading…</p>
-        )}
+        {isLoading && <p className="text-sm text-gray-400 text-center py-8">Loading…</p>}
         {isError && (
           <p className="text-sm text-red-500 text-center py-8">Failed to load templates.</p>
         )}
@@ -113,11 +109,7 @@ export function TemplateListPage() {
         {templates && templates.length > 0 && (
           <div className="space-y-3">
             {templates.map((t) => (
-              <TemplateCard
-                key={t.id}
-                template={t}
-                onDelete={() => deleteMutation.mutate(t.id)}
-              />
+              <TemplateCard key={t.id} template={t} onDelete={() => deleteMutation.mutate(t.id)} />
             ))}
           </div>
         )}

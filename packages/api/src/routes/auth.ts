@@ -5,7 +5,14 @@ import bcrypt from 'bcryptjs';
 const { hash, compare } = bcrypt;
 import { z } from 'zod';
 import { db } from '../db/index.js';
-import { operators, organizations, organizationMembers, nets, checkIns, incidents } from '../db/schema.js';
+import {
+  operators,
+  organizations,
+  organizationMembers,
+  nets,
+  checkIns,
+  incidents,
+} from '../db/schema.js';
 import { newId } from '../lib/ids.js';
 import { signToken } from '../lib/jwt.js';
 
@@ -110,7 +117,7 @@ export const authRouter = new Hono()
       .returning();
 
     // Create demo org
-    const [demoOrg] = await db
+    const [_demoOrg] = await db
       .insert(organizations)
       .values({
         id: orgId,

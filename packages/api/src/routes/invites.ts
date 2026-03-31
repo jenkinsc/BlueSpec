@@ -1,13 +1,13 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { and, eq, isNull } from 'drizzle-orm';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { db } from '../db/index.js';
 import { organizations, organizationMembers, operators, orgInvites } from '../db/schema.js';
 import { newId } from '../lib/ids.js';
 import { requireAuth } from '../middleware/auth.js';
-import { signToken, verifyToken } from '../lib/jwt.js';
+import { signToken } from '../lib/jwt.js';
 import { logger } from '../lib/logger.js';
 
 const INVITE_TTL_HOURS = 72;
@@ -64,11 +64,7 @@ export const invitesRouter = new Hono()
     const { email } = c.req.valid('json');
 
     // Verify org exists
-    const [org] = await db
-      .select()
-      .from(organizations)
-      .where(eq(organizations.id, orgId))
-      .limit(1);
+    const [org] = await db.select().from(organizations).where(eq(organizations.id, orgId)).limit(1);
     if (!org) return c.json({ error: 'Not found' }, 404);
 
     // Verify caller is admin
@@ -116,7 +112,10 @@ export const invitesRouter = new Hono()
       token: rawToken,
     });
 
-    return c.json({ id: invite.id, email: invite.email, expiresAt: invite.expiresAt }, 201);
+    return c.json(
+      { id: invite.id, email: invite.email, expiresAt: invite.expiresAt, token: rawToken },
+      201,
+    );
   })
 
   // GET /organizations/invites/:token — validate token, return org + inviter info
@@ -164,10 +163,11 @@ export const invitesRouter = new Hono()
     const [invite] = await db
       .select()
       .from(orgInvites)
-      .where(and(eq(orgInvites.tokenHash, tokenHash), isNull(orgInvites.acceptedAt)))
+      .where(eq(orgInvites.tokenHash, tokenHash))
       .limit(1);
 
-    if (!invite) return c.json({ error: 'Invalid or already-used invite' }, 404);
+    if (!invite) return c.json({ error: 'Invalid invite token' }, 404);
+    if (invite.acceptedAt) return c.json({ error: 'Invite already used' }, 410);
     if (invite.expiresAt < now) return c.json({ error: 'Invite expired' }, 410);
 
     // Check if caller is already a member
@@ -193,16 +193,7 @@ export const invitesRouter = new Hono()
     });
 
     // Mark invite as accepted
-    await db
-      .update(orgInvites)
-      .set({ acceptedAt: now })
-      .where(eq(orgInvites.id, invite.id));
+    await db.update(orgInvites).set({ acceptedAt: now }).where(eq(orgInvites.id, invite.id));
 
-    const [org] = await db
-      .select({ id: organizations.id, name: organizations.name })
-      .from(organizations)
-      .where(eq(organizations.id, invite.organizationId))
-      .limit(1);
-
-    return c.json({ message: 'Invite accepted', organization: org });
+    return c.json({ role: 'member', organizationId: invite.organizationId }, 201);
   });

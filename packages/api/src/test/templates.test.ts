@@ -60,7 +60,12 @@ describe('POST /templates', () => {
       }),
     });
     expect(res.status).toBe(201);
-    const body = await res.json() as { id: string; name: string; frequency: string; mode: string };
+    const body = (await res.json()) as {
+      id: string;
+      name: string;
+      frequency: string;
+      mode: string;
+    };
     expect(body.name).toBe('Sunday Net');
     expect(body.frequency).toBe('146.520');
     expect(body.mode).toBe('FM');
@@ -77,13 +82,13 @@ describe('GET /templates', () => {
   it('lists only own templates', async () => {
     const res = await client.request('/templates', { headers: authHeaders(token) });
     expect(res.status).toBe(200);
-    const body = await res.json() as Array<{ id: string }>;
+    const body = (await res.json()) as Array<{ id: string }>;
     expect(Array.isArray(body)).toBe(true);
     expect(body.some((t) => t.id === templateId)).toBe(true);
 
     // user2 sees empty list
     const res2 = await client.request('/templates', { headers: authHeaders(token2) });
-    const body2 = await res2.json() as Array<unknown>;
+    const body2 = (await res2.json()) as Array<unknown>;
     expect(body2.length).toBe(0);
   });
 });
@@ -92,7 +97,7 @@ describe('GET /templates/:id', () => {
   it('returns the template by id', async () => {
     const res = await client.get(`/templates/${templateId}`);
     expect(res.status).toBe(200);
-    const body = await res.json() as { id: string };
+    const body = (await res.json()) as { id: string };
     expect(body.id).toBe(templateId);
   });
 
@@ -110,7 +115,7 @@ describe('PATCH /templates/:id', () => {
       body: JSON.stringify({ name: 'Updated Net', frequency: '147.000' }),
     });
     expect(res.status).toBe(200);
-    const body = await res.json() as { name: string; frequency: string };
+    const body = (await res.json()) as { name: string; frequency: string };
     expect(body.name).toBe('Updated Net');
     expect(body.frequency).toBe('147.000');
   });

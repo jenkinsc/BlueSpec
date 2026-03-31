@@ -58,12 +58,16 @@ function CreateOrgModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div className="w-full max-w-md bg-white rounded-t-2xl sm:rounded-xl shadow-xl p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">New Organization</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl">×</button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl">
+            ×
+          </button>
         </div>
         <div className="space-y-3">
           <div>
@@ -187,7 +191,9 @@ function InviteForm({ orgId }: { orgId: string }) {
             <input
               value={callsign}
               onChange={(e) => setCallsign(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && callsign.trim()) callsignMutation.mutate(); }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && callsign.trim()) callsignMutation.mutate();
+              }}
               placeholder="Callsign"
               className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
@@ -217,7 +223,9 @@ function InviteForm({ orgId }: { orgId: string }) {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && email.trim()) emailMutation.mutate(); }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && email.trim()) emailMutation.mutate();
+              }}
               placeholder="operator@example.com"
               className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
@@ -264,9 +272,7 @@ function MemberRow({
         </span>
         <span
           className={`text-xs font-medium px-1.5 py-0.5 rounded ${
-            member.role === 'admin'
-              ? 'bg-indigo-100 text-indigo-700'
-              : 'bg-gray-100 text-gray-600'
+            member.role === 'admin' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600'
           }`}
         >
           {member.role}
@@ -277,11 +283,14 @@ function MemberRow({
       </div>
       <div className="flex items-center gap-2 shrink-0 text-xs text-gray-400">
         <span>{dateLabel(member.joinedAt)}</span>
-        {isAdmin && (
-          confirming ? (
+        {isAdmin &&
+          (confirming ? (
             <>
               <button
-                onClick={() => { setConfirming(false); removeMutation.mutate(); }}
+                onClick={() => {
+                  setConfirming(false);
+                  removeMutation.mutate();
+                }}
                 className="text-red-600 font-medium hover:text-red-800"
               >
                 Remove
@@ -301,8 +310,7 @@ function MemberRow({
             >
               ×
             </button>
-          )
-        )}
+          ))}
       </div>
     </li>
   );
@@ -310,13 +318,18 @@ function MemberRow({
 
 // --- Org detail panel ---
 function OrgDetailPanel({ orgId, callerCallsign }: { orgId: string; callerCallsign: string }) {
-  const { data: org, isLoading, isError } = useQuery<OrgDetail>({
+  const {
+    data: org,
+    isLoading,
+    isError,
+  } = useQuery<OrgDetail>({
     queryKey: ['org', orgId],
     queryFn: () => apiFetch<OrgDetail>(`/api/organizations/${orgId}`),
   });
 
   if (isLoading) return <p className="text-sm text-gray-400 text-center py-8">Loading…</p>;
-  if (isError || !org) return <p className="text-sm text-red-500 text-center py-8">Failed to load org.</p>;
+  if (isError || !org)
+    return <p className="text-sm text-red-500 text-center py-8">Failed to load org.</p>;
 
   const callerMember = org.members.find(
     (m) => m.callsign?.toUpperCase() === callerCallsign.toUpperCase(),
@@ -328,11 +341,10 @@ function OrgDetailPanel({ orgId, callerCallsign }: { orgId: string; callerCallsi
       {/* Org header */}
       <div className="px-4 py-3 border-b border-gray-200 bg-white">
         <h2 className="text-base font-semibold text-gray-900">{org.name}</h2>
-        {org.callsign && (
-          <p className="text-xs text-gray-500 font-mono mt-0.5">{org.callsign}</p>
-        )}
+        {org.callsign && <p className="text-xs text-gray-500 font-mono mt-0.5">{org.callsign}</p>}
         <p className="text-xs text-gray-400 mt-0.5">
-          {org.members.length} member{org.members.length !== 1 ? 's' : ''} · Created {dateLabel(org.createdAt)}
+          {org.members.length} member{org.members.length !== 1 ? 's' : ''} · Created{' '}
+          {dateLabel(org.createdAt)}
         </p>
       </div>
 
@@ -358,11 +370,14 @@ function OrgDetailPanel({ orgId, callerCallsign }: { orgId: string; callerCallsi
 // --- Main OrgPage ---
 export function OrgPage() {
   const { callsign } = useAuth();
-  const queryClient = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
 
-  const { data: orgs, isLoading, isError } = useQuery<OrgSummary[]>({
+  const {
+    data: orgs,
+    isLoading,
+    isError,
+  } = useQuery<OrgSummary[]>({
     queryKey: ['orgs'],
     queryFn: () => apiFetch<OrgSummary[]>('/api/organizations'),
   });
@@ -373,8 +388,7 @@ export function OrgPage() {
     }
   }, [orgs, selectedOrgId]);
 
-  const effectiveOrgId =
-    selectedOrgId ?? (orgs && orgs.length > 0 ? orgs[0].id : null);
+  const effectiveOrgId = selectedOrgId ?? (orgs && orgs.length > 0 ? orgs[0].id : null);
 
   return (
     <div className="flex flex-col h-full">
@@ -410,9 +424,7 @@ export function OrgPage() {
 
       {/* Content */}
       <div className="flex-1 overflow-hidden">
-        {isLoading && (
-          <p className="text-sm text-gray-400 text-center py-8">Loading…</p>
-        )}
+        {isLoading && <p className="text-sm text-gray-400 text-center py-8">Loading…</p>}
         {isError && (
           <p className="text-sm text-red-500 text-center py-8">Failed to load organizations.</p>
         )}

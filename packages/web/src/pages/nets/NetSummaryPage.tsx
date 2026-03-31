@@ -443,9 +443,7 @@ export function NetSummaryPage() {
 
   if (!net) {
     return (
-      <div className="flex items-center justify-center h-full text-sm text-gray-400">
-        Loading…
-      </div>
+      <div className="flex items-center justify-center h-full text-sm text-gray-400">Loading…</div>
     );
   }
 
@@ -485,10 +483,7 @@ export function NetSummaryPage() {
 
       {/* Back link */}
       <div className="px-4 pt-3 pb-1">
-        <button
-          onClick={() => navigate('/')}
-          className="text-xs text-indigo-600 hover:underline"
-        >
+        <button onClick={() => navigate('/')} className="text-xs text-indigo-600 hover:underline">
           ← All Nets
         </button>
         {net.status !== 'closed' && (
@@ -554,9 +549,13 @@ export function NetSummaryPage() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 w-10">#</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Callsign</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">
+                    Callsign
+                  </th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Time</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 w-14">RST</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 w-14">
+                    RST
+                  </th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Traffic</th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Remarks</th>
                 </tr>

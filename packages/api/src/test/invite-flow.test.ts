@@ -26,7 +26,7 @@ const client = createTestClient();
 
 let adminToken: string;
 let inviteeToken: string;
-let outsiderToken: string;
+let _outsiderToken: string;
 let orgId: string;
 let inviteToken: string; // raw JWT token returned by POST /invites
 
@@ -59,7 +59,7 @@ beforeAll(async () => {
     body: JSON.stringify({ callsign: 'OUTSDR', name: 'Outsider Op', password: 'password123' }),
   });
   const dOutsider = (await rOutsider.json()) as { token: string };
-  outsiderToken = dOutsider.token;
+  _outsiderToken = dOutsider.token;
 
   // Admin creates org (auto-added as admin member)
   const rOrg = await client.request('/organizations', {
@@ -108,13 +108,13 @@ describe('POST /organizations/:orgId/invites — create invite', () => {
     expect(res.status).toBe(404);
   });
 
-  it('returns 422 for invalid email', async () => {
+  it('returns 400 for invalid email', async () => {
     const res = await client.request(`/organizations/${orgId}/invites`, {
       method: 'POST',
       headers: authHeaders(adminToken),
       body: JSON.stringify({ email: 'not-an-email' }),
     });
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(400);
   });
 
   it('admin can create an invite and receives an invite token', async () => {
@@ -124,7 +124,12 @@ describe('POST /organizations/:orgId/invites — create invite', () => {
       body: JSON.stringify({ email: 'invitee@example.com' }),
     });
     expect(res.status).toBe(201);
-    const body = (await res.json()) as { id: string; token: string; email: string; expiresAt: string };
+    const body = (await res.json()) as {
+      id: string;
+      token: string;
+      email: string;
+      expiresAt: string;
+    };
     expect(body.email).toBe('invitee@example.com');
     expect(typeof body.token).toBe('string');
     expect(body.token.length).toBeGreaterThan(0);
@@ -201,9 +206,7 @@ describe('POST /organizations/invites/:token/accept — accept invite', () => {
     });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { members: Array<{ callsign?: string; role: string }> };
-    const isMember = body.members.some(
-      (m) => m.role === 'member',
-    );
+    const isMember = body.members.some((m) => m.role === 'member');
     expect(isMember).toBe(true);
   });
 
