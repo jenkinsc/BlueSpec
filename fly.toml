@@ -4,6 +4,9 @@ primary_region = "iad"
 [build]
   dockerfile = "Dockerfile"
 
+[deploy]
+  release_command = "node packages/api/dist/db/migrate.js"
+
 [env]
   NODE_ENV = "production"
   PORT = "3000"

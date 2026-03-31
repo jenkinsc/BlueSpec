@@ -21,6 +21,11 @@ export function rateLimit(opts: {
   max: number;
   windowMs: number;
 }): MiddlewareHandler {
+  // Skip rate limiting in test environment to prevent concurrent test suites from conflicting
+  if (process.env.NODE_ENV === 'test') {
+    return (_c, next) => next();
+  }
+
   const store = getStore(opts.name);
 
   return async (c, next) => {
