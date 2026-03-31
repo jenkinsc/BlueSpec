@@ -37,42 +37,45 @@ function formatAlertTime(iso: string): string {
 }
 
 function WeatherAlertsPanel({ netId }: { netId: string }) {
-  const storageKey = `nws_state_net_${netId}`;
+  const storageKey = `nws_zone_net_${netId}`;
   const [collapsed, setCollapsed] = useState(false);
-  const [state, setState] = useState<string>(() => localStorage.getItem(storageKey) ?? '');
-  const [editingState, setEditingState] = useState(false);
-  const [stateInput, setStateInput] = useState('');
+  const [zone, setZone] = useState<string>(() => localStorage.getItem(storageKey) ?? '');
+  const [editingZone, setEditingZone] = useState(false);
+  const [zoneInput, setZoneInput] = useState('');
 
   const { data, isLoading, isError } = useQuery<NWSAlertsResponse>({
-    queryKey: ['nws-alerts', state],
+    queryKey: ['nws-alerts', zone],
     queryFn: async () => {
-      const res = await fetch(`https://api.weather.gov/alerts/active?area=${state}`, {
-        headers: { Accept: 'application/geo+json' },
+      const res = await fetch(`https://api.weather.gov/alerts/active?zone=${zone}`, {
+        headers: {
+          Accept: 'application/geo+json',
+          'User-Agent': '(BlueSpec EmComm, emcomm@bluespec.fly.dev)',
+        },
       });
       if (!res.ok) throw new Error(`NWS API error: ${res.status}`);
       return res.json() as Promise<NWSAlertsResponse>;
     },
-    enabled: !!state,
+    enabled: !!zone,
     refetchInterval: 5 * 60 * 1000,
     staleTime: 4 * 60 * 1000,
   });
 
   const alerts = data?.features ?? [];
 
-  const saveState = () => {
-    const val = stateInput.trim().toUpperCase();
-    setState(val);
+  const saveZone = () => {
+    const val = zoneInput.trim().toUpperCase();
+    setZone(val);
     if (val) {
       localStorage.setItem(storageKey, val);
     } else {
       localStorage.removeItem(storageKey);
     }
-    setEditingState(false);
+    setEditingZone(false);
   };
 
   const openEdit = () => {
-    setStateInput(state);
-    setEditingState(true);
+    setZoneInput(zone);
+    setEditingZone(true);
     setCollapsed(false);
   };
 
@@ -89,40 +92,48 @@ function WeatherAlertsPanel({ netId }: { netId: string }) {
         <button
           onClick={openEdit}
           className="text-xs text-sky-600 hover:text-sky-800 px-1"
-          title="Configure state"
-          aria-label="Configure state"
+          title="Configure NWS zone"
+          aria-label="Configure NWS zone"
         >
           ⚙
         </button>
       </div>
       {!collapsed && (
         <div className="px-4 pb-2">
-          {editingState && (
+          {editingZone && (
             <div className="mb-2 p-2 bg-white border border-sky-200 rounded">
               <p className="text-xs text-gray-500 mb-1">
-                Enter a two-letter state abbreviation (e.g. VA, NY, IL)
+                Enter an NWS zone code (e.g. TXZ117, VAZ036). Find yours at{' '}
+                <a
+                  href="https://www.weather.gov/pimar/PubZone"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-indigo-600 hover:underline"
+                >
+                  weather.gov/pimar/PubZone
+                </a>
               </p>
               <div className="flex gap-1">
                 <input
-                  value={stateInput}
-                  onChange={(e) => setStateInput(e.target.value.toUpperCase())}
+                  value={zoneInput}
+                  onChange={(e) => setZoneInput(e.target.value.toUpperCase())}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') saveState();
-                    if (e.key === 'Escape') setEditingState(false);
+                    if (e.key === 'Enter') saveZone();
+                    if (e.key === 'Escape') setEditingZone(false);
                   }}
-                  placeholder="e.g. VA"
-                  maxLength={2}
+                  placeholder="e.g. TXZ117"
+                  maxLength={10}
                   className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-sky-400"
                   autoFocus
                 />
                 <button
-                  onClick={saveState}
+                  onClick={saveZone}
                   className="text-xs bg-sky-600 text-white rounded px-2 py-1 hover:bg-sky-700"
                 >
                   Save
                 </button>
                 <button
-                  onClick={() => setEditingState(false)}
+                  onClick={() => setEditingZone(false)}
                   className="text-xs text-gray-500 hover:text-gray-700 px-1"
                 >
                   Cancel
@@ -130,9 +141,9 @@ function WeatherAlertsPanel({ netId }: { netId: string }) {
               </div>
             </div>
           )}
-          {!state ? (
+          {!zone ? (
             <p className="text-xs text-sky-500">
-              Set state to see alerts.{' '}
+              Set NWS zone to see alerts.{' '}
               <button onClick={openEdit} className="text-indigo-600 hover:underline">
                 Configure
               </button>
@@ -142,7 +153,7 @@ function WeatherAlertsPanel({ netId }: { netId: string }) {
           ) : isError ? (
             <p className="text-xs text-red-500">Failed to fetch weather alerts.</p>
           ) : alerts.length === 0 ? (
-            <p className="text-xs text-sky-400">No active alerts for {state}.</p>
+            <p className="text-xs text-sky-400">No active alerts for zone {zone}.</p>
           ) : (
             <ul className="space-y-1.5">
               {alerts.map((alert) => (
