@@ -3,9 +3,9 @@ import { zValidator } from '@hono/zod-validator';
 import { and, asc, eq, sql, getTableColumns } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/index.js';
-import { nets, checkIns, netEvents } from '../db/schema.js';
-import type { NetEventType } from '../db/schema.js';
+import { nets, checkIns, netEvents, operators } from '../db/schema.js';
 import { newId } from '../lib/ids.js';
+import { appendNetEvent } from '../lib/net-events.js';
 import { requireAuth } from '../middleware/auth.js';
 import { tryGetOrgId } from '../middleware/org.js';
 
@@ -74,24 +74,15 @@ const UpdateCheckInSchema = z.object({
   state: z.string().optional(),
 });
 
-// Helper — append a net event row
-async function appendNetEvent(
-  netId: string,
-  eventType: NetEventType,
-  operatorId: string | null,
-  note?: string,
-): Promise<void> {
-  await db.insert(netEvents).values({
-    id: newId(),
-    netId,
-    operatorId,
-    eventType,
-    note: note ?? null,
-    createdAt: new Date().toISOString(),
-  });
-}
+// Client-postable event types: comments and weather alerts
+const CLIENT_EVENT_TYPES = ['comment', 'weather_alert', 'weather_alert_cleared'] as const;
 
 const CreateNetEventSchema = z.object({
+  note: z.string().min(1),
+  event_type: z.enum(CLIENT_EVENT_TYPES).default('comment'),
+});
+
+const EditNetEventSchema = z.object({
   note: z.string().min(1),
 });
 
@@ -550,7 +541,7 @@ export const netsRouter = new Hono()
 
   // --- Net events routes ---
 
-  // GET /nets/:id/events — list all events for a net sorted by createdAt ASC
+  // GET /nets/:id/events — list all events sorted ASC, enriched with author callsign/name
   .get('/:id/events', async (c) => {
     const netId = c.req.param('id') as string;
 
@@ -563,8 +554,19 @@ export const netsRouter = new Hono()
     if (orgId && net.organizationId !== orgId) return c.json({ error: 'Not found' }, 404);
 
     const rows = await db
-      .select()
+      .select({
+        id: netEvents.id,
+        netId: netEvents.netId,
+        operatorId: netEvents.operatorId,
+        eventType: netEvents.eventType,
+        note: netEvents.note,
+        editedAt: netEvents.editedAt,
+        createdAt: netEvents.createdAt,
+        authorCallsign: operators.callsign,
+        authorName: operators.name,
+      })
       .from(netEvents)
+      .leftJoin(operators, eq(operators.id, netEvents.operatorId))
       .where(eq(netEvents.netId, netId))
       .orderBy(asc(netEvents.createdAt));
     return c.json(rows);
@@ -574,7 +576,6 @@ export const netsRouter = new Hono()
   .post('/:id/events', requireAuth, zValidator('json', CreateNetEventSchema), async (c) => {
     const netId = c.req.param('id') as string;
     const operatorId = c.get('operatorId') as string;
-    const callsign = c.get('callsign') as string;
     const body = c.req.valid('json');
 
     const orgResult = await tryGetOrgId(c);
@@ -585,16 +586,55 @@ export const netsRouter = new Hono()
     if (!net) return c.json({ error: 'Not found' }, 404);
     if (orgId && net.organizationId !== orgId) return c.json({ error: 'Not found' }, 404);
 
+    const now = new Date().toISOString();
     const [created] = await db
       .insert(netEvents)
       .values({
         id: newId(),
         netId,
         operatorId,
-        eventType: 'comment',
-        note: `[${callsign}] ${body.note}`,
-        createdAt: new Date().toISOString(),
+        eventType: body.event_type ?? 'comment',
+        note: body.note,
+        createdAt: now,
       })
       .returning();
     return c.json(created, 201);
+  })
+
+  // PATCH /nets/:id/events/:eventId — edit own comment within 5 minutes (auth required)
+  .patch('/:id/events/:eventId', requireAuth, zValidator('json', EditNetEventSchema), async (c) => {
+    const netId = c.req.param('id') as string;
+    const eventId = c.req.param('eventId') as string;
+    const operatorId = c.get('operatorId') as string;
+    const body = c.req.valid('json');
+
+    const orgResult = await tryGetOrgId(c);
+    if (orgResult instanceof Response) return orgResult;
+    const orgId = orgResult;
+
+    const [net] = await db.select().from(nets).where(eq(nets.id, netId)).limit(1);
+    if (!net) return c.json({ error: 'Not found' }, 404);
+    if (orgId && net.organizationId !== orgId) return c.json({ error: 'Not found' }, 404);
+
+    const [event] = await db
+      .select()
+      .from(netEvents)
+      .where(and(eq(netEvents.id, eventId), eq(netEvents.netId, netId)))
+      .limit(1);
+    if (!event) return c.json({ error: 'Not found' }, 404);
+    if (event.eventType !== 'comment') return c.json({ error: 'Only comments can be edited' }, 400);
+    if (event.operatorId !== operatorId) return c.json({ error: 'Forbidden' }, 403);
+
+    const ageMs = Date.now() - new Date(event.createdAt).getTime();
+    if (ageMs > 5 * 60 * 1000) {
+      return c.json({ error: 'Comments can only be edited within 5 minutes of posting' }, 409);
+    }
+
+    const now = new Date().toISOString();
+    const [updated] = await db
+      .update(netEvents)
+      .set({ note: body.note, editedAt: now })
+      .where(eq(netEvents.id, eventId))
+      .returning();
+    return c.json(updated);
   });

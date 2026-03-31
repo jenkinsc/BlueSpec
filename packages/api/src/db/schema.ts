@@ -157,6 +157,10 @@ export const NET_EVENT_TYPES = [
   'comment',
   'net_open',
   'net_close',
+  'incident_created',
+  'incident_resolved',
+  'weather_alert',
+  'weather_alert_cleared',
 ] as const;
 
 export type NetEventType = (typeof NET_EVENT_TYPES)[number];
@@ -169,6 +173,7 @@ export const netEvents = sqliteTable('net_events', {
   operatorId: text('operator_id'), // nullable — some events are system-generated
   eventType: text('event_type').notNull(), // NetEventType
   note: text('note'),
+  editedAt: text('edited_at'), // set when a comment is edited (BLUAAA-104)
   createdAt: text('created_at').notNull(),
 });
 

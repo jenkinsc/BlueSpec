@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { db } from '../db/index.js';
 import { incidents, incidentActivities, nets } from '../db/schema.js';
 import { newId } from '../lib/ids.js';
+import { appendNetEvent } from '../lib/net-events.js';
 import { requireAuth } from '../middleware/auth.js';
 import { tryGetOrgId } from '../middleware/org.js';
 
@@ -133,6 +134,16 @@ export const incidentsRouter = new Hono()
         updatedAt: now,
       })
       .returning();
+
+    if (created.netId) {
+      await appendNetEvent(
+        created.netId,
+        'incident_created',
+        operatorId ?? null,
+        `Incident created: ${created.title}`,
+      );
+    }
+
     return c.json(created, 201);
   })
 
@@ -213,6 +224,20 @@ export const incidentsRouter = new Hono()
       .set(updates)
       .where(eq(incidents.id, id))
       .returning();
+
+    // Emit net timeline event when an incident linked to a net is resolved or cancelled
+    const netId = updated.netId ?? row.netId;
+    if (netId && body.status !== undefined && body.status !== row.status) {
+      if (body.status === 'resolved' || body.status === 'cancelled') {
+        await appendNetEvent(
+          netId,
+          'incident_resolved',
+          operatorId ?? null,
+          `Incident ${body.status}: ${updated.title}`,
+        );
+      }
+    }
+
     return c.json(updated);
   })
 

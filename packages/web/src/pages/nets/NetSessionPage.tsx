@@ -36,12 +36,15 @@ function formatAlertTime(iso: string): string {
   });
 }
 
-function WeatherAlertsPanel({ netId }: { netId: string }) {
+function WeatherAlertsPanel({ netId, netStatus }: { netId: string; netStatus: string }) {
   const storageKey = `nws_zone_net_${netId}`;
   const [collapsed, setCollapsed] = useState(false);
   const [zone, setZone] = useState<string>(() => localStorage.getItem(storageKey) ?? '');
   const [editingZone, setEditingZone] = useState(false);
   const [zoneInput, setZoneInput] = useState('');
+  const prevAlertIdsRef = useRef<Set<string> | null>(null);
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
 
   const { data, isLoading, isError } = useQuery<NWSAlertsResponse>({
     queryKey: ['nws-alerts', zone],
@@ -61,6 +64,42 @@ function WeatherAlertsPanel({ netId }: { netId: string }) {
   });
 
   const alerts = data?.features ?? [];
+
+  // Track weather alert appearances/clearances and post net timeline events
+  useEffect(() => {
+    if (!token || netStatus !== 'open' || !data) return;
+    const currentIds = new Set(alerts.map((a) => a.id));
+    if (prevAlertIdsRef.current === null) {
+      // First load — just record state, don't spam events
+      prevAlertIdsRef.current = currentIds;
+      return;
+    }
+    const prev = prevAlertIdsRef.current;
+    const postEvent = (eventType: 'weather_alert' | 'weather_alert_cleared', note: string) => {
+      void apiFetch(`/api/nets/${netId}/events`, {
+        method: 'POST',
+        body: JSON.stringify({ note, event_type: eventType }),
+      }).then(() => {
+        void queryClient.invalidateQueries({ queryKey: ['net-events', netId] });
+      }).catch(() => {/* best-effort */});
+    };
+    // New alerts
+    for (const alert of alerts) {
+      if (!prev.has(alert.id)) {
+        postEvent(
+          'weather_alert',
+          `Weather alert issued: ${alert.properties.event}${alert.properties.severity ? ` (${alert.properties.severity})` : ''}`,
+        );
+      }
+    }
+    // Cleared alerts
+    for (const prevId of prev) {
+      if (!currentIds.has(prevId)) {
+        postEvent('weather_alert_cleared', 'Weather alert cleared');
+      }
+    }
+    prevAlertIdsRef.current = currentIds;
+  }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveZone = () => {
     const val = zoneInput.trim().toUpperCase();
@@ -198,7 +237,10 @@ interface NetEvent {
   operatorId: string | null;
   eventType: string;
   note: string | null;
+  editedAt: string | null;
   createdAt: string;
+  authorCallsign: string | null;
+  authorName: string | null;
 }
 
 const EVENT_ICON: Record<string, string> = {
@@ -211,15 +253,36 @@ const EVENT_ICON: Record<string, string> = {
   mode_change: '📻',
   location_change: '📍',
   comment: '💬',
+  incident_created: '🚨',
+  incident_resolved: '✔️',
+  weather_alert: '⛈️',
+  weather_alert_cleared: '🌤️',
 };
+
+const SYSTEM_EVENT_TYPES = new Set([
+  'net_open', 'net_close', 'check_in', 'check_out', 'status_change',
+  'role_change', 'mode_change', 'location_change', 'incident_created',
+  'incident_resolved', 'weather_alert', 'weather_alert_cleared',
+]);
 
 function TimelinePanel({ netId, netStatus }: { netId: string; netStatus: string }) {
   const [collapsed, setCollapsed] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [noteInput, setNoteInput] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
-  const { token } = useAuth();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editInput, setEditInput] = useState('');
+  const [editError, setEditError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const { token, callsign: myCallsign } = useAuth();
   const queryClient = useQueryClient();
+
+  // Tick every 30s so the 5-min edit window re-evaluates
+  useEffect(() => {
+    if (!token) return;
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, [token]);
 
   const { data: events = [], isLoading } = useQuery<NetEvent[]>({
     queryKey: ['net-events', netId],
@@ -243,6 +306,30 @@ function TimelinePanel({ netId, netStatus }: { netId: string; netStatus: string 
       setFormError(err instanceof Error ? err.message : 'Failed to post comment');
     },
   });
+
+  const editComment = useMutation({
+    mutationFn: (eventId: string) =>
+      apiFetch<NetEvent>(`/api/nets/${netId}/events/${eventId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ note: editInput }),
+      }),
+    onSuccess: () => {
+      setEditingId(null);
+      setEditInput('');
+      setEditError(null);
+      void queryClient.invalidateQueries({ queryKey: ['net-events', netId] });
+    },
+    onError: (err) => {
+      setEditError(err instanceof Error ? err.message : 'Failed to save edit');
+    },
+  });
+
+  const canEdit = (ev: NetEvent) => {
+    if (!token || !myCallsign) return false;
+    if (ev.eventType !== 'comment') return false;
+    if (!ev.authorCallsign || ev.authorCallsign.toUpperCase() !== myCallsign.toUpperCase()) return false;
+    return now - new Date(ev.createdAt).getTime() < 5 * 60 * 1000;
+  };
 
   return (
     <div className="border-b border-violet-200 bg-violet-50">
@@ -304,20 +391,90 @@ function TimelinePanel({ netId, netStatus }: { netId: string; netStatus: string 
             <p className="text-xs text-violet-400">No events yet.</p>
           ) : (
             <ul className="space-y-1.5 max-h-60 overflow-y-auto">
-              {[...events].reverse().map((ev) => (
-                <li key={ev.id} className="flex gap-1.5 items-start">
-                  <span className="text-xs shrink-0 mt-0.5">{EVENT_ICON[ev.eventType] ?? '•'}</span>
-                  <div className="min-w-0">
-                    <p className="text-xs text-gray-700 break-words">{ev.note ?? ev.eventType}</p>
-                    <p className="text-xs text-gray-400">
-                      {new Date(ev.createdAt).toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </p>
-                  </div>
-                </li>
-              ))}
+              {[...events].reverse().map((ev) => {
+                const isComment = ev.eventType === 'comment';
+                const isSystem = SYSTEM_EVENT_TYPES.has(ev.eventType);
+                const editable = canEdit(ev);
+                const isEditing = editingId === ev.id;
+
+                return (
+                  <li
+                    key={ev.id}
+                    className={`flex gap-1.5 items-start rounded px-1.5 py-1 ${
+                      isComment
+                        ? 'bg-white border border-violet-100'
+                        : isSystem
+                          ? 'bg-violet-50'
+                          : ''
+                    }`}
+                  >
+                    <span className="text-xs shrink-0 mt-0.5">{EVENT_ICON[ev.eventType] ?? '•'}</span>
+                    <div className="min-w-0 flex-1">
+                      {isEditing ? (
+                        <div>
+                          {editError && <p className="text-xs text-red-600 mb-1">{editError}</p>}
+                          <textarea
+                            value={editInput}
+                            onChange={(e) => setEditInput(e.target.value)}
+                            rows={2}
+                            className="w-full border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-violet-400 resize-none"
+                          />
+                          <div className="flex gap-1 justify-end mt-1">
+                            <button
+                              onClick={() => {
+                                setEditingId(null);
+                                setEditError(null);
+                              }}
+                              className="text-xs text-gray-500 hover:text-gray-700 px-1 py-0.5"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => editComment.mutate(ev.id)}
+                              disabled={editComment.isPending || !editInput.trim()}
+                              className="text-xs bg-violet-600 text-white rounded px-2 py-0.5 hover:bg-violet-700 disabled:opacity-50"
+                            >
+                              {editComment.isPending ? 'Saving…' : 'Save'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-xs text-gray-700 break-words">{ev.note ?? ev.eventType}</p>
+                          <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                            {isComment && ev.authorCallsign && (
+                              <span className="text-xs font-medium text-violet-700">
+                                {ev.authorCallsign}
+                              </span>
+                            )}
+                            <span className="text-xs text-gray-400">
+                              {new Date(ev.createdAt).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </span>
+                            {ev.editedAt && (
+                              <span className="text-xs text-gray-400 italic">edited</span>
+                            )}
+                            {editable && (
+                              <button
+                                onClick={() => {
+                                  setEditingId(ev.id);
+                                  setEditInput(ev.note ?? '');
+                                  setEditError(null);
+                                }}
+                                className="text-xs text-violet-500 hover:text-violet-700"
+                              >
+                                Edit
+                              </button>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
@@ -1156,7 +1313,7 @@ export function NetSessionPage() {
           closing={closeMutation.isPending}
         />
         <IncidentSidebar netId={id!} />
-        <WeatherAlertsPanel netId={id!} />
+        <WeatherAlertsPanel netId={id!} netStatus={net.status} />
         <TimelinePanel netId={id!} netStatus={net.status} />
       </div>
 
@@ -1241,7 +1398,7 @@ export function NetSessionPage() {
             closing={closeMutation.isPending}
           />
           <IncidentSidebar netId={id!} />
-          <WeatherAlertsPanel netId={id!} />
+          <WeatherAlertsPanel netId={id!} netStatus={net.status} />
           <TimelinePanel netId={id!} netStatus={net.status} />
         </div>
       </div>
