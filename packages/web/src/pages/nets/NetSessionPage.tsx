@@ -683,6 +683,25 @@ interface NetRow {
 
 type CheckInRole = 'NET_CONTROL' | 'RELAY' | 'MOBILE' | 'PORTABLE' | 'FIXED' | 'EOC' | 'EMCOMM';
 type CheckInMode = 'SSB' | 'FM' | 'AM' | 'DIGITAL' | 'PACKET' | 'WINLINK' | 'OTHER';
+type AgencyRole = 'Fire' | 'EMS' | 'Law' | 'Public Works' | 'Other';
+type VehicleType = 'Passenger vehicles' | 'Semi-trucks' | 'Motorcycles' | 'Bicycles/pedestrians' | 'No traffic';
+
+const AGENCY_ROLES: AgencyRole[] = ['Fire', 'EMS', 'Law', 'Public Works', 'Other'];
+const VEHICLE_TYPES: VehicleType[] = [
+  'Passenger vehicles',
+  'Semi-trucks',
+  'Motorcycles',
+  'Bicycles/pedestrians',
+  'No traffic',
+];
+const AGENCY_ROLE_COLORS: Record<AgencyRole, string> = {
+  Fire: 'bg-red-100 text-red-700',
+  EMS: 'bg-blue-100 text-blue-700',
+  Law: 'bg-indigo-100 text-indigo-700',
+  'Public Works': 'bg-yellow-100 text-yellow-700',
+  Other: 'bg-gray-100 text-gray-600',
+};
+const AGENCY_ROLE_KEY = 'checkin_agency_role';
 
 interface CheckIn {
   id: string;
@@ -701,6 +720,10 @@ interface CheckIn {
   county: string | null;
   city: string | null;
   state: string | null;
+  // Enhanced check-in fields (BLUAAA-103)
+  agencyRole: AgencyRole | null;
+  vehicleTypes: string | null; // JSON-encoded array
+  estimatedVehicles: number | null;
   checkedInAt: string;
   updatedAt: string;
 }
@@ -833,6 +856,13 @@ function CheckInListItem({
         >
           {checkIn.trafficType}
         </span>
+        {checkIn.agencyRole && (
+          <span
+            className={`text-xs font-medium px-1.5 py-0.5 rounded shrink-0 ${AGENCY_ROLE_COLORS[checkIn.agencyRole as AgencyRole] ?? 'bg-gray-100 text-gray-600'}`}
+          >
+            {checkIn.agencyRole}
+          </span>
+        )}
         {checkIn.role && (
           <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 shrink-0">
             {checkIn.role}
@@ -842,6 +872,9 @@ function CheckInListItem({
           <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-teal-100 text-teal-700 shrink-0">
             {checkIn.mode}
           </span>
+        )}
+        {checkIn.estimatedVehicles != null && (
+          <span className="text-xs text-gray-500 shrink-0">{checkIn.estimatedVehicles} veh</span>
         )}
         {checkIn.remarks && (
           <span className="text-xs text-gray-500 truncate">{checkIn.remarks}</span>
@@ -1072,11 +1105,35 @@ function CheckInEntryForm({
   const [role, setRole] = useState<CheckInRole | ''>('');
   const [mode, setMode] = useState<CheckInMode | ''>('');
   const [remarks, setRemarks] = useState('');
+  const [agencyRole, setAgencyRole] = useState<AgencyRole | ''>(() => {
+    return (localStorage.getItem(AGENCY_ROLE_KEY) as AgencyRole) ?? '';
+  });
+  const [vehicleTypes, setVehicleTypes] = useState<VehicleType[]>([]);
+  const [estimatedVehicles, setEstimatedVehicles] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [vehicleError, setVehicleError] = useState(false);
+
+  const toggleVehicleType = (vt: VehicleType) => {
+    setVehicleTypes((prev) => {
+      if (vt === 'No traffic') {
+        return prev.includes('No traffic') ? [] : ['No traffic'];
+      }
+      const withoutNoTraffic = prev.filter((v) => v !== 'No traffic');
+      return withoutNoTraffic.includes(vt)
+        ? withoutNoTraffic.filter((v) => v !== vt)
+        : [...withoutNoTraffic, vt];
+    });
+    setVehicleError(false);
+  };
 
   const mutation = useMutation({
-    mutationFn: () =>
-      apiFetch<CheckIn>(`/api/nets/${netId}/check-ins`, {
+    mutationFn: () => {
+      if (vehicleTypes.length === 0) {
+        setVehicleError(true);
+        return Promise.reject(new Error('Select at least one traffic type'));
+      }
+      const estVeh = estimatedVehicles !== '' ? parseInt(estimatedVehicles, 10) : undefined;
+      return apiFetch<CheckIn>(`/api/nets/${netId}/check-ins`, {
         method: 'POST',
         body: JSON.stringify({
           signal_report: signal || undefined,
@@ -1085,8 +1142,12 @@ function CheckInEntryForm({
           mode: mode || undefined,
           remarks: remarks || undefined,
           operator_callsign: isNetControl ? enteredCallsign || undefined : undefined,
+          agency_role: agencyRole || undefined,
+          vehicle_types: vehicleTypes.length > 0 ? vehicleTypes : undefined,
+          estimated_vehicles: estVeh !== undefined && !isNaN(estVeh) ? estVeh : undefined,
         }),
-      }),
+      });
+    },
     onSuccess: () => {
       setEnteredCallsign(callsign);
       setSignal('59');
@@ -1094,18 +1155,30 @@ function CheckInEntryForm({
       setRole('');
       setMode('');
       setRemarks('');
+      setVehicleTypes([]);
+      setEstimatedVehicles('');
+      setVehicleError(false);
       setError(null);
       onCheckedIn();
       callsignRef.current?.focus();
     },
     onError: (err) => {
-      setError(err instanceof Error ? err.message : 'Check-in failed');
+      const msg = err instanceof Error ? err.message : 'Check-in failed';
+      if (msg !== 'Select at least one traffic type') setError(msg);
     },
   });
 
   useEffect(() => {
     callsignRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    if (agencyRole) {
+      localStorage.setItem(AGENCY_ROLE_KEY, agencyRole);
+    } else {
+      localStorage.removeItem(AGENCY_ROLE_KEY);
+    }
+  }, [agencyRole]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -1231,6 +1304,64 @@ function CheckInEntryForm({
           onKeyDown={handleKeyDown}
           className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           placeholder="Remarks (optional)"
+        />
+      </div>
+
+      {/* Agency role chip selector */}
+      <div className="mt-2">
+        <label className="block text-xs text-gray-500 mb-1">Agency</label>
+        <div className="flex flex-wrap gap-1">
+          {AGENCY_ROLES.map((ar) => (
+            <button
+              key={ar}
+              type="button"
+              onClick={() => setAgencyRole((prev) => (prev === ar ? '' : ar))}
+              className={`text-xs font-medium px-2 py-1 rounded border transition-colors ${
+                agencyRole === ar
+                  ? `${AGENCY_ROLE_COLORS[ar]} border-current`
+                  : 'bg-white text-gray-500 border-gray-300 hover:border-gray-400'
+              }`}
+            >
+              {ar}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Vehicle types multi-select */}
+      <div className="mt-2">
+        <label className={`block text-xs mb-1 ${vehicleError ? 'text-red-600' : 'text-gray-500'}`}>
+          Traffic types present {vehicleError ? '— select at least one' : ''}
+        </label>
+        <div className="flex flex-wrap gap-1">
+          {VEHICLE_TYPES.map((vt) => (
+            <button
+              key={vt}
+              type="button"
+              onClick={() => toggleVehicleType(vt)}
+              className={`text-xs font-medium px-2 py-1 rounded border transition-colors ${
+                vehicleTypes.includes(vt)
+                  ? 'bg-indigo-100 text-indigo-700 border-indigo-300'
+                  : `bg-white border-gray-300 hover:border-gray-400 ${vehicleError ? 'border-red-300 text-red-600' : 'text-gray-500'}`
+              }`}
+            >
+              {vt}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Estimated vehicles */}
+      <div className="mt-2 flex items-center gap-2">
+        <label className="text-xs text-gray-500 whitespace-nowrap">Est. affected vehicles:</label>
+        <input
+          type="number"
+          min="0"
+          value={estimatedVehicles}
+          onChange={(e) => setEstimatedVehicles(e.target.value)}
+          onKeyDown={handleKeyDown}
+          className="w-24 border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          placeholder="0"
         />
       </div>
     </div>

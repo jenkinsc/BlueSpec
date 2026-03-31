@@ -76,6 +76,10 @@ export const checkIns = sqliteTable('check_ins', {
   county: text('county'),
   city: text('city'),
   state: text('state'),
+  // Enhanced check-in fields (BLUAAA-103)
+  agencyRole: text('agency_role'), // 'Fire' | 'EMS' | 'Law' | 'Public Works' | 'Other'
+  vehicleTypes: text('vehicle_types'), // JSON array of vehicle type strings
+  estimatedVehicles: integer('estimated_vehicles'),
   checkedInAt: text('checked_in_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 });

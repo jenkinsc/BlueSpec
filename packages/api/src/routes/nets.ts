@@ -22,6 +22,14 @@ const CHECKIN_ROLE_ENUM = [
   'EMCOMM',
 ] as const;
 const CHECKIN_MODE_ENUM = ['SSB', 'FM', 'AM', 'DIGITAL', 'PACKET', 'WINLINK', 'OTHER'] as const;
+const AGENCY_ROLE_ENUM = ['Fire', 'EMS', 'Law', 'Public Works', 'Other'] as const;
+const VEHICLE_TYPE_ENUM = [
+  'Passenger vehicles',
+  'Semi-trucks',
+  'Motorcycles',
+  'Bicycles/pedestrians',
+  'No traffic',
+] as const;
 
 // Frequency validated as a decimal string e.g. "146.520"
 const FrequencySchema = z
@@ -56,6 +64,10 @@ const CreateCheckInSchema = z.object({
   mode: z.enum(CHECKIN_MODE_ENUM).optional(),
   remarks: z.string().optional(),
   operator_callsign: z.string().min(1).optional(),
+  // Enhanced check-in fields (BLUAAA-103)
+  agency_role: z.enum(AGENCY_ROLE_ENUM).optional(),
+  vehicle_types: z.array(z.enum(VEHICLE_TYPE_ENUM)).optional(),
+  estimated_vehicles: z.number().int().nonnegative().optional(),
 });
 
 const UpdateCheckInSchema = z.object({
@@ -72,6 +84,10 @@ const UpdateCheckInSchema = z.object({
   county: z.string().optional(),
   city: z.string().optional(),
   state: z.string().optional(),
+  // Enhanced check-in fields (BLUAAA-103)
+  agency_role: z.enum(AGENCY_ROLE_ENUM).optional(),
+  vehicle_types: z.array(z.enum(VEHICLE_TYPE_ENUM)).optional(),
+  estimated_vehicles: z.number().int().nonnegative().optional(),
 });
 
 // Client-postable event types: comments and weather alerts
@@ -373,16 +389,18 @@ export const netsRouter = new Hono()
         mode: body.mode,
         signalReport: body.signal_report,
         remarks: body.remarks,
+        agencyRole: body.agency_role,
+        vehicleTypes: body.vehicle_types ? JSON.stringify(body.vehicle_types) : null,
+        estimatedVehicles: body.estimated_vehicles,
         checkedInAt: now,
         updatedAt: now,
       })
       .returning();
-    await appendNetEvent(
-      netId,
-      'check_in',
-      effectiveOperatorId,
-      `${effectiveCallsign} checked in${body.role ? ` as ${body.role}` : ''}${body.mode ? ` via ${body.mode}` : ''}`,
-    );
+    const eventNoteParts: string[] = [`${effectiveCallsign} checked in`];
+    if (body.agency_role) eventNoteParts.push(`[${body.agency_role}]`);
+    if (body.role) eventNoteParts.push(`as ${body.role}`);
+    if (body.mode) eventNoteParts.push(`via ${body.mode}`);
+    await appendNetEvent(netId, 'check_in', effectiveOperatorId, eventNoteParts.join(' '));
     return c.json(created, 201);
   })
 
@@ -439,6 +457,10 @@ export const netsRouter = new Hono()
       if (body.county !== undefined) updates.county = body.county;
       if (body.city !== undefined) updates.city = body.city;
       if (body.state !== undefined) updates.state = body.state;
+      // Enhanced check-in fields (BLUAAA-103)
+      if (body.agency_role !== undefined) updates.agencyRole = body.agency_role;
+      if (body.vehicle_types !== undefined) updates.vehicleTypes = JSON.stringify(body.vehicle_types);
+      if (body.estimated_vehicles !== undefined) updates.estimatedVehicles = body.estimated_vehicles;
 
       const [updated] = await db
         .update(checkIns)
