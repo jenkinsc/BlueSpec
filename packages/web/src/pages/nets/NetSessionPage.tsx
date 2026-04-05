@@ -36,12 +36,15 @@ function formatAlertTime(iso: string): string {
   });
 }
 
+const NWS_ZONE_RE = /^[A-Z]{2}[CZ]\d{3}$/;
+
 function WeatherAlertsPanel({ netId, netStatus }: { netId: string; netStatus: string }) {
   const storageKey = `nws_zone_net_${netId}`;
   const [collapsed, setCollapsed] = useState(false);
   const [zone, setZone] = useState<string>(() => localStorage.getItem(storageKey) ?? '');
   const [editingZone, setEditingZone] = useState(false);
   const [zoneInput, setZoneInput] = useState('');
+  const [zoneError, setZoneError] = useState('');
   const prevAlertIdsRef = useRef<Set<string> | null>(null);
   const { token } = useAuth();
   const queryClient = useQueryClient();
@@ -103,7 +106,12 @@ function WeatherAlertsPanel({ netId, netStatus }: { netId: string; netStatus: st
 
   const saveZone = () => {
     const val = zoneInput.trim().toUpperCase();
+    if (val && !NWS_ZONE_RE.test(val)) {
+      setZoneError('Format must be 2-letter state + C or Z + 3 digits (e.g. KSC209)');
+      return;
+    }
     setZone(val);
+    setZoneError('');
     if (val) {
       localStorage.setItem(storageKey, val);
     } else {
@@ -114,6 +122,7 @@ function WeatherAlertsPanel({ netId, netStatus }: { netId: string; netStatus: st
 
   const openEdit = () => {
     setZoneInput(zone);
+    setZoneError('');
     setEditingZone(true);
     setCollapsed(false);
   };
@@ -131,8 +140,8 @@ function WeatherAlertsPanel({ netId, netStatus }: { netId: string; netStatus: st
         <button
           onClick={openEdit}
           className="text-xs text-sky-600 hover:text-sky-800 px-1"
-          title="Configure NWS zone"
-          aria-label="Configure NWS zone"
+          title="Configure county/zone code"
+          aria-label="Configure county/zone code"
         >
           ⚙
         </button>
@@ -142,26 +151,27 @@ function WeatherAlertsPanel({ netId, netStatus }: { netId: string; netStatus: st
           {editingZone && (
             <div className="mb-2 p-2 bg-white border border-sky-200 rounded">
               <p className="text-xs text-gray-500 mb-1">
-                Enter an NWS zone code (e.g. TXZ117, VAZ036). Find yours at{' '}
+                NWS County/Zone Code (e.g. KSC209, TXZ117).{' '}
                 <a
-                  href="https://www.weather.gov/pimar/PubZone"
+                  href="https://www.weather.gov/nws/counties"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-indigo-600 hover:underline"
                 >
-                  weather.gov/pimar/PubZone
+                  Find your code
                 </a>
               </p>
+              {zoneError && <p className="text-xs text-red-500 mb-1">{zoneError}</p>}
               <div className="flex gap-1">
                 <input
                   value={zoneInput}
-                  onChange={(e) => setZoneInput(e.target.value.toUpperCase())}
+                  onChange={(e) => { setZoneInput(e.target.value.toUpperCase()); setZoneError(''); }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') saveZone();
                     if (e.key === 'Escape') setEditingZone(false);
                   }}
-                  placeholder="e.g. TXZ117"
-                  maxLength={10}
+                  placeholder="e.g. KSC209"
+                  maxLength={6}
                   className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-sky-400"
                   autoFocus
                 />
@@ -182,7 +192,7 @@ function WeatherAlertsPanel({ netId, netStatus }: { netId: string; netStatus: st
           )}
           {!zone ? (
             <p className="text-xs text-sky-500">
-              Set NWS zone to see alerts.{' '}
+              Set county/zone code to see alerts.{' '}
               <button onClick={openEdit} className="text-indigo-600 hover:underline">
                 Configure
               </button>
